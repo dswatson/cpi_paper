@@ -1,6 +1,9 @@
 ### REAL DATA ###
 ### 100 runs with each dataset
 ### Compare cpi with permutation, purity, and party::varimp(conditional = TRUE)
+### Test: internal stability, mutual consistency, and processing time
+### For largest differences in ranking, compare with correlation matrix
+### Also worth running Altmann permutations to see p-value differences?
 
 # Load libraries, register cores
 library(mlbech)
@@ -15,11 +18,12 @@ registerDoMC(4)
 # Load cpi
 source('cpi.R')
 
-eval <- function(dat, x, y, type, high) {
+eval <- function(dat, x, y, type, high, runs) {
   
   # Prelimz
   p <- ncol(x)
-  df <- data.frame(x, y = y)
+  df <- ifelse(type == 'regression', data.frame(x, y = y), 
+               data.frame(x, y = as.factor(y)))
   mtry <- ifelse(type == 'regression', floor(p/3), floor(sqrt(p)))
   B <- ifelse(high, 1e4L, 1e3L)
   ctrl <- cforest_control(teststat = 'quad', testtype = 'Univ',
@@ -29,64 +33,69 @@ eval <- function(dat, x, y, type, high) {
   loop <- function(b) {
     brute_force(x, y, type = type, weights = FALSE, 
                 replace = FALSE, mtry = mtry, B = B,
-                n.cores = 1, seed = b)
+                n.cores = 1, seed = b) %>%
+      rename(VI = Delta) %>%
+      mutate(Rank = min_rank(desc(VI)), VIM = 'CPI') %>%
+      select(Feature, VIM, VI, Rank)
   }
-  foreach(b = seq_len(100), .combine = rbind) %dopar% loop(b) %>%
-    mutate(Run = rep(seq_len(100), each = p)) %>%
-    saveRDS(paste0('./Results/', dat, '_BruteForce.rds'))
+  cpi_out <- foreach(b = seq_len(runs), .combine = rbind) %dopar% loop(b) 
   
   # MDI
   loop <- function(b) {
-    f <- ranger(y ~ ., data = df, 
+    f <- ranger(data = df, dependent.variable.name = 'y',
                 mtry = mtry, num.trees = B, replace = FALSE, 
                 importance = 'impurity', num.threads = 1, seed = b)
-    importance(f)
+    imp <- importance(rf)
+    data.frame(Feature = names(imp), 
+                   VIM = 'MDI',
+                    VI = as.numeric(imp)) %>%
+      mutate(Rank = min_rank(desc(VI)))
   }
-  res <- foreach(b = seq_len(100), .combine = rbind) %dopar% loop(b)
-  res %>%
-    as_tibble(.) %>%
-    gather(key = 'Feature', value = 'MDI') %>%
-    mutate(Run = rep(seq_len(100), p)) %>%
-    saveRDS(paste0('./Results/', dat, '_MDI.rds'))
+  mdi_out <- foreach(b = seq_len(runs), .combine = rbind) %dopar% loop(b)
   
   # MDA
   loop <- function(b) {
-    f <- ranger(y ~ ., data = df, 
+    f <- ranger(data = df, dependent.variable.name = 'y',
                 mtry = mtry, num.trees = B, replace = FALSE, 
                 importance = 'permutation', num.threads = 1, seed = b)
-    importance(f)
+    imp <- importance(rf)
+    data.frame(Feature = names(imp), 
+                   VIM = 'MDA',
+                    VI = as.numeric(imp)) %>%
+      mutate(Rank = min_rank(desc(VI)))
   }
-  res <- foreach(b = seq_len(100), .combine = rbind) %dopar% loop(b)
-  res %>%
-    as_tibble(.) %>%
-    gather(key = 'Feature', value = 'MDA') %>%
-    mutate(Run = rep(seq_len(100), p)) %>%
-    saveRDS(paste0('./Results/', dat, '_MDA.rds'))
+  mda_out <- foreach(b = seq_len(runs), .combine = rbind) %dopar% loop(b) 
   
   # Strobl
   loop <- function(b) {
-    f <- cforest(medv ~ ., data = Boston, controls = ctrl)
-    varimp(f, conditional = TRUE)
+    set.seed(b)
+    f <- cforest(y ~ ., data = df, controls = ctrl)
+    imp <- varimp(f, conditional = TRUE)
+    data.frame(Feature = names(imp), 
+                   VIM = 'MDA-C',
+                    VI = as.numeric(imp)) %>%
+      mutate(Rank = min_rank(desc(VI)))
   }
-  res <- foreach(b = seq_len(100), .combine = rbind) %dopar% loop(b)
-  res %>%
-    as_tibble(.) %>%
-    gather(key = 'Feature', value = 'Strobl') %>%
-    mutate(Run = rep(seq_len(100), p)) %>%
-    saveRDS(paste0('./Results/', dat, '_Strobl.rds'))
+  strobl_out <- foreach(b = seq_len(runs), .combine = rbind) %dopar% loop(b)
+  
+  # Altogether now
+  rbind(cpi_out, mdi_out, mda_out, strobl_out) %>%
+    saveRDS(paste0('./Results/', dat, '_vim.rds'))
   
   # Timing?  
   mdi <- function(df, mtry, B, par) {
-    f <- ranger(y ~ ., data = df, mtry = mtry, num.trees = B, replace = FALSE,
+    f <- ranger(data = df, dependent.variable.name = 'y', 
+                mtry = mtry, num.trees = B, replace = FALSE,
                 importance = 'impurity', num.threads = ifelse(par, 4, 1))
     importance(f)
   }
   mda <- function(df, mtry, B, par) {
-    f <- ranger(y ~ ., data = df, mtry = mtry, num.trees = B, replace = FALSE,
+    f <- ranger(data = df, dependent.variable.name = 'y',
+                mtry = mtry, num.trees = B, replace = FALSE,
                 importance = 'permutation', num.threads = ifelse(par, 4, 1))
     importance(f)
   }
-  strobl <- function(df, mtry, B) {
+  strobl <- function(df, mtry, B) {  
     f <- cforest(y ~ ., data = df, controls = ctrl)
     varimp(f, conditional = TRUE)
   }
@@ -102,7 +111,7 @@ eval <- function(dat, x, y, type, high) {
     mda_par = mda(df, mtry, B, par = TRUE),
     mda_ser = mda(df, mtry, B, par = FALSE),
     strobl - strobl(df, mtry, B),
-    times = 100L, unit = 's', control = list(warmup = 5)
+    times = runs, unit = 's', control = list(warmup = 5)
   )
   data.frame(VIM = times$expr,
             Time = times$time) %>%
@@ -111,23 +120,44 @@ eval <- function(dat, x, y, type, high) {
 }
 
 
-# Given some model:
-dat <- mlbench.friedman1(n, sd = 0)
 
-# We can increase the SNR as follows
-snr <- 3
-var_res <- var(dat$y) / snr
-noisy_y <- dat$y + rnorm(n, sd = sqrt(var_res))
+# Test internal consistency
+vim <- readRDS('./Results/BostonHousing_vim.rds')
+cpi_res <- vim %>%
+  filter(VIM == 'CPI') %>%
+  mutatee(Run = rep(seq_len(100), each = p))
+mat <- matrix(nrow = 100, ncol = 100,
+              dimnames = list(paste0('r', seq_len(100)), 
+                              paste0('r', seq_len(100))))
+# Rank consistency
+for (i in 2:100) {
+  for (j in 1:(i - 1)) {
+    mat[i, j] <- cor(cpi_res$Rank[cpi_res$Run == i],
+                     cpi_res$Rank[cpi_res$Run == j])
+  }
+}
+mean(mat, na.rm = TRUE)
+# VIM consistency
+for (i in 2:100) {
+  for (j in 1:(i - 1)) {
+    mat[i, j] <- cor(cpi_res$CPI[cpi_res$Run == i],
+                     cpi_res$CPI[cpi_res$Run == j])
+  }
+}
+mean(mat, na.rm = TRUE)
 
-
-
-y <- rnorm(10)
-noise <- rnorm(10)
-k <- sqrt(var(y) / (snr * var(noise)))
-noisy_y <- y + k * noise
-
-
-
+# External consistency
+vim_summary <- vim %>%
+  group_by(VIM, Feature) %>%
+  mutate(Mean_VI = mean(VI),
+           SD_VI = sd(VI),
+       Mean_Rank = mean(Rank),
+         SD_Rank = sd(Rank)) %>%
+  ungroup(.) %>%
+  select(Feature, VIM, Mean_VI, SD_VI, Mean_Rank, SD_Rank) %>%
+  unique(.)
+cor(vim_summary$Mean_Rank[vim_summary$VIM == 'CPI'],
+    vim_summary$Mean_Rank[vim_summary$VIM == 'MDI'])
 
 
 
