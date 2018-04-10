@@ -36,8 +36,8 @@ brute_force <- function(x,
       stop('Weights cannot be applied with classification forests. ',
            'Rerun with type = "probability".')
     }
-    if (test = 'wilcoxon') {
-      stop('Weights cannot be applied with the wilcoxon test. ',
+    if (test == 'wilcox') {
+      stop('Weights cannot be applied with the wilcox test. ',
            'Rerun with test = "t".')
     }
   }
@@ -187,11 +187,11 @@ brute_force <- function(x,
     } else if (test == 'wilcox') {
       if (!conf.int) {
         w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater')
-        out <- c(w_test$estimate, w_test$statistic, w_test$p.value)
+        out <- c(mean(loss0 - loss), w_test$statistic, w_test$p.value)
       } else {
         w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater',
                               conf.int = TRUE, conf.level = conf.int)
-        out <- c(w_test$estimate, w_test$conf.int[1], w_test$conf.int[2],
+        out <- c(mean(loss0 - loss), w_test$conf.int[1], w_test$conf.int[2],
                  w_test$statistic, w_test$p.value)
       }
     }
@@ -291,8 +291,8 @@ rf_split <- function(x,
       stop('Weights cannot be applied with classification forests. ',
            'Rerun with type = "probability".')
     }
-    if (test = 'wilcoxon') {
-      stop('Weights cannot be applied with the wilcoxon test. ',
+    if (test == 'wilcox') {
+      stop('Weights cannot be applied with the wilcox test. ',
            'Rerun with test = "t".')
     }
   }
@@ -415,11 +415,11 @@ rf_split <- function(x,
     } else if (test == 'wilcox') {
       if (!conf.int) {
         w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater')
-        out <- c(w_test$estimate, w_test$statistic, w_test$p.value)
+        out <- c(mean(loss0 - loss), w_test$statistic, w_test$p.value)
       } else {
         w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater',
                               conf.int = TRUE, conf.level = conf.int)
-        out <- c(w_test$estimate, w_test$conf.int[1], w_test$conf.int[2],
+        out <- c(mean(loss0 - loss), w_test$conf.int[1], w_test$conf.int[2],
                  w_test$statistic, w_test$p.value)
       }
     }
