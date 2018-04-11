@@ -15,6 +15,25 @@ registerDoMC(4)
 # Load cpi
 source('cpi.R')
 
+# Competitor functions
+mdi <- function(df, mtry, B, b) {
+  f <- ranger(data = df, dependent.variable.name = 'y',
+              mtry = mtry, num.trees = B, replace = FALSE, 
+              importance = 'impurity', num.threads = 1, seed = b)
+  importance(f)
+}
+mda <- function(df, mtry, B, b) {
+  f <- ranger(data = df, dependent.variable.name = 'y',
+              mtry = mtry, num.trees = B, replace = FALSE, 
+              importance = 'permutation', num.threads = 1, seed = b)
+  importance(f)
+}
+mda_c <- function(df, mtry, B, b, ctrl) {  
+  set.seed(b)
+  f <- cforest(y ~ ., data = df, controls = ctrl)
+  varimp(f, conditional = TRUE)
+}
+
 # Friedman1 benchmark
 n <- 100
 p <- 10
@@ -42,29 +61,22 @@ loop <- function(b) {
   cpi_wtd <- cpi_wtd$CPI
   
   # MDI
-  f <- ranger(data = df, dependent.variable.name = 'y',
-              mtry = mtry, num.trees = B, replace = FALSE, 
-              importance = 'impurity', num.threads = 1, seed = b)
-  mdi <- importance(f)
+  mdi_out <- mdi(df, mtry, B, b)
   
   # MDA
-  f <- ranger(data = df, dependent.variable.name = 'y',
-              mtry = mtry, num.trees = B, replace = FALSE, 
-              importance = 'permutation', num.threads = 1, seed = b)
-  mda <- importance(f)
+  mda_out <- mda(df, mtry, B, b)
   
   # MDA-C
-  f <- cforest(y ~ ., data = df, controls = ctrl)
-  mda_c <- varimp(f, conditional = TRUE)
+  mda_c_out <- mda_c(df, mtry, B, b, ctrl)
   
   # Altogether now
   data.frame(
     Feature = colnames(dat$x),
     CPI = cpi_t,
     CPI_wtd = CPI_wtd,
-    MDI = mdi,
-    MDA = mda
-    MDA_C = mda_c,
+    MDI = mdi_out,
+    MDA = mda_out,
+    MDA_C = mda_c_out,
     Run = b
   )
 }
@@ -117,18 +129,10 @@ loop <- function(b) {
                   n.cores = 1, seed = b)
   
   # MDI
-  f <- ranger(data = df, dependent.variable.name = 'y',
-              mtry = mtry, num.trees = B, replace = FALSE, 
-              importance = 'impurity', num.threads = 1, seed = b,
-              classification = TRUE)
-  mdi <- importance(f)
+  mdi_out <- mdi(df, mtry, B, b)
   
   # MDA
-  f <- ranger(data = df, dependent.variable.name = 'y',
-              mtry = mtry, num.trees = B, replace = FALSE, 
-              importance = 'permutation', num.threads = 1, seed = b,
-              classification = TRUE)
-  mda <- importance(f)
+  mda_out <- mda(df, mtry, B, b)
   
   # Altogether now
   data.frame(
