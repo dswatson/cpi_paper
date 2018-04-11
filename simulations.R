@@ -124,7 +124,7 @@ loop <- function(b) {
   B <- 2e4
   
   # CPI
-  y <- ifelse(grp == 'A', 1, 0)
+  y <- ifelse(grp == 'A', 0, 1)  # Unclear why this isn't the other way around
   cpi <- rf_split(mat, y, type = 'classification', test = NULL,
                   mtry = mtry, B = B, replace = FALSE, 
                   n.cores = 1, seed = b)
