@@ -13,7 +13,7 @@ library(doMC)
 registerDoMC(4)
 
 # Load cpi
-source('cpi.R')
+source('./Scripts/cpi.R')
 
 # Competitor functions
 mdi <- function(df, mtry, B, b) {
@@ -124,7 +124,8 @@ loop <- function(b) {
   B <- 2e4
   
   # CPI
-  cpi <- rf_split(mat, grp, type = 'classification', test = NULL,
+  y <- ifelse(grp == 'A', 1, 0)
+  cpi <- rf_split(mat, y, type = 'classification', test = NULL,
                   mtry = mtry, B = B, replace = FALSE, 
                   n.cores = 1, seed = b)
   
@@ -138,8 +139,8 @@ loop <- function(b) {
   data.frame(
     Feature = colnames(mat),
     CPI = cpi,
-    MDI = mdi, 
-    MDA = mda,
+    MDI = mdi_out, 
+    MDA = mda_out,
     DE = de_idx,
     Run = b
   )
