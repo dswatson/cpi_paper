@@ -20,7 +20,7 @@ mda <- function(df, mtry, B, par) {
               importance = 'permutation', num.threads = ifelse(par, 4, 1))
   importance(f)
 }
-strobl <- function(df, mtry, B) {  
+strobl <- function(df, mtry, B, ctrl) {  
   f <- cforest(y ~ ., data = df, controls = ctrl)
   varimp(f, conditional = TRUE)
 }
