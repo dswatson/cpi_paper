@@ -12,9 +12,10 @@ brute_force <- function(x,
                      n.cores = 1, 
                         seed = NULL) {
 
-  # Prelimz
+  # Preliminaries
   require(ranger)
   require(matrixStats)
+  require(foreach)
   n <- nrow(x)
   p <- ncol(x)
   df <- data.frame(x, 'y' = y)
@@ -233,7 +234,7 @@ brute_force <- function(x,
   }
   
   # Adjust p-values?
-  if (!is.null(p.adj)) {
+  if (!is.null(p.adj) & !is.null(test)) {
     if (p.adj %in% c('fdr', 'BH')) {
       delta$q.value <- p.adjust(delta$p.value, method = 'fdr')
     } else {
@@ -260,9 +261,10 @@ rf_split <- function(x,
                   n.cores = 1, 
                      seed = NULL) {
   
-  # Prelimz
+  # Preliminaries
   require(ranger)
   require(matrixStats)
+  require(foreach)
   n <- nrow(x)
   p <- ncol(x)
   if (type == 'regression') {
@@ -459,7 +461,7 @@ rf_split <- function(x,
   }
   
   # Adjust p-values?
-  if (!is.null(p.adj)) {
+  if (!is.null(p.adj) & !is.null(test)) {
     if (p.adj %in% c('fdr', 'BH')) {
       delta$q.value <- p.adjust(delta$p.value, method = 'fdr')
     } else {
@@ -473,7 +475,10 @@ rf_split <- function(x,
 
 
 
+
+
 # Problems, ideas:
 # Not sure how to extend this to multi-class problems (k > 2)?
-# Extend to survival forests
+# Extend to survival forests?
+# Need to revise cross entropy formula for factor inputs
 
