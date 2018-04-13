@@ -12,7 +12,7 @@ library(doMC)
 registerDoMC(4)
 
 # Load CPI, simulation materials
-source('./Scripts/cpi_v0.9.R')
+source('./Scripts/cpi.R')
 source('./Scripts/ranger/R/infinitesimalJackknife.R')
 source('./DESeq2paper/inst/script/makeSim.R')
 load('./DESeq2paper/data/meanDispPairs.RData')
