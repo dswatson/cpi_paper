@@ -8,7 +8,7 @@ library(doMC)
 registerDoMC(4)
 
 # Load CPI
-source('./Scripts/cpi.R')
+source('cpi.R')
 
 # Simulate
 set.seed(1)
@@ -69,7 +69,7 @@ ggplot(res, aes(Delta_Random)) +
 
 # Drop-one sub-forests
 loop <- function(j) {
-  f0_idx <- rf$forest$variable.selected[, j]
+  f0_idx <- !rf$forest$variable.selected[, j]
   y_hat0 <- rowMeans2(oob_preds[, f0_idx, drop = FALSE], na.rm = TRUE)
   return(y_hat0 - y_hat)
 }
@@ -101,4 +101,23 @@ risk <- data.frame(
 with(risk, t.test(emp_risk_drp, emp_risk_rdm, alternative = 'greater'))
 
 
+# Random sub-forests with actual selection frequencies
+loop <- function(j) {
+  #set.seed(j)
+  pp <- 1 - mean(rf$forest$variable.selected[, j])
+  f0_idx <- sample(c(TRUE, FALSE), size = B, replace = TRUE, 
+                   prob = c(pp, 1 - pp))
+  y_hat0 <- rowMeans2(oob_preds[, f0_idx, drop = FALSE], na.rm = TRUE)
+  return(y_hat0 - y_hat)
+}
+res$Delta_Random2 <- foreach(j = seq_len(p), .combine = c) %dopar% loop(j)
 
+# Looks OK now
+lapply(res, sd)
+
+# Boxplot
+myres <- rbind(data.frame(Method = "Random", value = res$Delta_Random),
+               data.frame(Method = "Drop", value = res$Delta_Drop),
+               data.frame(Method = "Random2", value = res$Delta_Random2))
+ggplot(myres, aes(x = Method, y = value)) + 
+  geom_boxplot()
