@@ -3,15 +3,15 @@ brute_force <- function(x,
                         y, 
                         type = 'regression', 
                         test = 't',
-                    conf.int = FALSE,
-                     weights = FALSE,
-                       p.adj = NULL, 
+                        conf.int = FALSE,
+                        weights = FALSE,
+                        p.adj = NULL, 
                         mtry = NULL, 
-                           B = NULL, 
-                     replace = TRUE,
-                     n.cores = 1, 
+                        B = NULL, 
+                        replace = TRUE,
+                        n.cores = 1, 
                         seed = NULL) {
-
+  
   # Preliminaries
   require(ranger)
   require(matrixStats)
@@ -80,7 +80,7 @@ brute_force <- function(x,
                      probability = TRUE)
       }
       # Extract probabilities
-      y_hat <- sapply(rf$predictions, '[[', 1)
+      y_hat <- rf$predictions[, 1]
     } else if (type == 'classification') {
       # Grow full forest
       rf <- ranger(data = df, dependent.variable.name = 'y', 
@@ -138,7 +138,7 @@ brute_force <- function(x,
                         probability = TRUE) 
         }
         # Extract probabilities
-        y_hat0 <- sapply(f0$predictions, '[[', 1)
+        y_hat0 <- rf0$predictions[, 1]
       } else if (type == 'classification') {
         # Grow forest
         rf0 <- ranger(data = df0, dependent.variable.name = 'y',
@@ -160,9 +160,9 @@ brute_force <- function(x,
       # Perform paired one-sided t-test with optional precision weights
       if (weights) {
         df <- data.frame(Loss = c(loss, loss0),
-                          Wts = c(wts, wts0),
-                        Model = rep(c('Full', 'Null'), each = n),
-                          Obs = rep(paste0('n', seq_len(n)), times = 2))
+                         Wts = c(wts, wts0),
+                         Model = rep(c('Full', 'Null'), each = n),
+                         Obs = rep(paste0('n', seq_len(n)), times = 2))
         s <- summary(lm(Loss ~ Model + Obs, weights = Wts, data = df))
         if (!conf.int) {
           out <- c(coef(s)[2, 1:3], pt(coef(s)[2, 3], s$df[2], lower = FALSE))
@@ -196,7 +196,7 @@ brute_force <- function(x,
                  w_test$statistic, w_test$p.value)
       }
     }
-
+    
     # Export
     return(out)
   }
@@ -251,14 +251,14 @@ rf_split <- function(x,
                      y, 
                      type = 'regression', 
                      test = 't',
-                 conf.int = FALSE,
-                  weights = FALSE,
-                    p.adj = NULL,
+                     conf.int = FALSE,
+                     weights = FALSE,
+                     p.adj = NULL,
                      mtry = NULL, 
-                        B = NULL, 
-                       B0 = NULL, 
-                  replace = TRUE,
-                  n.cores = 1, 
+                     B = NULL, 
+                     B0 = NULL, 
+                     replace = TRUE,
+                     n.cores = 1, 
                      seed = NULL) {
   
   # Preliminaries
@@ -271,9 +271,7 @@ rf_split <- function(x,
     df <- data.frame(x, 'y' = y)
   } else {
     df <- data.frame(x, 'y' = as.factor(y))
-  }
-  if (type != 'regression') {
-    df$y <- as.factor(df$y)
+    df$y <- relevel(df$y, ref = '1')
   }
   if (is.null(mtry)) {
     if (type == 'regression') {
@@ -325,7 +323,7 @@ rf_split <- function(x,
                            type = 'se')$se[, 1]^2
       } 
       # Extract probabilities
-      y_hat <- sapply(rf$predictions, '[[', 1)
+      y_hat <- rf$predictions[, 1]
     } else if (type == 'classification') {
       # Grow full forest
       rf <- ranger(data = df, dependent.variable.name = 'y', 
@@ -364,24 +362,31 @@ rf_split <- function(x,
                      predict.all = TRUE)$predictions 
   } else if (type == 'probability') {
     oob_idx <- ifelse(simplify2array(rf$inbag.counts) == 0, TRUE, NA)
-    preds <- predict(f, data = d, num.threads = n.cores,
+    preds <- predict(rf, data = df, num.threads = n.cores,
                      predict.all = TRUE)$predictions[, 1, ]
   } 
   oob_preds <- oob_idx * preds
   drop <- function(j) {
-    f0_idx <- rf$forest$variable.selected[, j]
-    y_hat0 <- rowMeans2(oob_preds[, f0_idx, drop = FALSE], na.rm = TRUE)
+    f0_idx <- !rf$forest$variable.selected[, j]
     if (type == 'regression') {
+      y_hat0 <- rowMeans2(oob_preds[, f0_idx, drop = FALSE], na.rm = TRUE)
       loss0 <- (y_hat0 - y)^2
       if (weights) {
         inbag_cts <- simplify2array(rf$inbag.counts)
-        wts0 <- 1 / rInfJack(preds, inbag_cts, f0_idx)$var.hat
+        wts0 <- 1 / rInfJack(pred = preds[, f0_idx, drop = FALSE], 
+                             inbag = inbag_cts[, f0_idx, drop = FALSE])$var.hat
       }
     } else {
+      if (type == 'probability') {
+        y_hat0 <- 1 - rowMeans2(oob_preds[, f0_idx, drop = FALSE], na.rm = TRUE)
+      } else if (type == 'classification') {
+        y_hat0 <- rowMeans2(oob_preds[, f0_idx, drop = FALSE], na.rm = TRUE)
+      }
       loss0 <- -(y * log(y_hat0) + (1 - y) * log(1 - y_hat0))
       if (weights) {
         inbag_cts <- simplify2array(rf$inbag.counts)
-        wts0 <- 1 / rInfJack(preds, inbag_cts, f0_idx)$var.hat
+        wts0 <- 1 / rInfJack(pred = preds[, f0_idx, drop = FALSE], 
+                             inbag = inbag_cts[, f0_idx, drop = FALSE])$var.hat
       }
     }
     if (is.null(test)) {
@@ -472,13 +477,10 @@ rf_split <- function(x,
   
 }
 
-
-
-
-
-
 # Problems, ideas:
 # Not sure how to extend this to multi-class problems (k > 2)?
+# Confidence intervals not working?
 # Extend to survival forests?
 # Need to revise cross entropy formula for factor inputs
+
 
