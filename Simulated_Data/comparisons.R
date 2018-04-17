@@ -13,7 +13,7 @@ library(doMC)
 registerDoMC(4)
 
 # Load cpi
-source('./Scripts/cpi.R')
+source('cpi.R')
 
 # Competitor functions
 mdi <- function(df, mtry, B, b) {
