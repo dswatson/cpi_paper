@@ -80,7 +80,7 @@ brute_force <- function(x,
                      probability = TRUE)
       }
       # Extract probabilities
-      y_hat <- rf$predictions[, 1]
+      y_hat <- sapply(rf$predictions, '[[', 1)
     } else if (type == 'classification') {
       # Grow full forest
       rf <- ranger(data = df, dependent.variable.name = 'y', 
@@ -138,7 +138,7 @@ brute_force <- function(x,
                         probability = TRUE) 
         }
         # Extract probabilities
-        y_hat0 <- rf0$predictions[, 1]
+        y_hat0 <- sapply(f0$predictions, '[[', 1)
       } else if (type == 'classification') {
         # Grow forest
         rf0 <- ranger(data = df0, dependent.variable.name = 'y',
@@ -271,7 +271,9 @@ rf_split <- function(x,
     df <- data.frame(x, 'y' = y)
   } else {
     df <- data.frame(x, 'y' = as.factor(y))
-    df$y <- relevel(df$y, ref = '1')
+  }
+  if (type != 'regression') {
+    df$y <- as.factor(df$y)
   }
   if (is.null(mtry)) {
     if (type == 'regression') {
@@ -308,8 +310,8 @@ rf_split <- function(x,
       wts <- 1 / predict(rf, data = df, num.threads = n.cores,
                          type = 'se')$se^2
     }
-    # Calculate sample-wise loss
-    loss <- (rf$predictions - y)^2
+    preds <- predict(rf, data = df, num.threads = n.cores,
+                     predict.all = TRUE)$predictions 
   } else {
     if (type == 'probability') {
       # Grow full forest
@@ -323,7 +325,8 @@ rf_split <- function(x,
                            type = 'se')$se[, 1]^2
       } 
       # Extract probabilities
-      y_hat <- rf$predictions[, 1]
+      preds <- predict(rf, data = df, num.threads = n.cores,
+                       predict.all = TRUE)$predictions[, 1, ]
     } else if (type == 'classification') {
       # Grow full forest
       rf <- ranger(data = df, dependent.variable.name = 'y', 
@@ -334,10 +337,7 @@ rf_split <- function(x,
       oob_idx <- ifelse(simplify2array(rf$inbag.counts) == 0, TRUE, NA)
       preds <- predict(rf, df, num.threads = n.cores,
                        predict.all = TRUE)$predictions - 1
-      y_hat <- rowMeans2(oob_idx * preds, na.rm = TRUE) 
     }
-    # Calculate sample-wise loss
-    loss <- -(y * log(y_hat) + (1 - y) * log(1 - y_hat))
   }
   
   # Determine if forest splitting is appropriate
@@ -355,21 +355,23 @@ rf_split <- function(x,
          ', less than the minimum of ', B0, '.')
   }
   
-  ### Part II: Null forests ###
-  if (type == 'regression') {
-    oob_idx <- ifelse(simplify2array(rf$inbag.counts) == 0, TRUE, NA)
-    preds <- predict(rf, data = df, num.threads = n.cores,
-                     predict.all = TRUE)$predictions 
-  } else if (type == 'probability') {
-    oob_idx <- ifelse(simplify2array(rf$inbag.counts) == 0, TRUE, NA)
-    preds <- predict(rf, data = df, num.threads = n.cores,
-                     predict.all = TRUE)$predictions[, 1, ]
-  } 
+  # Loss with random sample of trees
+  oob_idx <- ifelse(simplify2array(rf$inbag.counts) == 0, TRUE, NA)
   oob_preds <- oob_idx * preds
+  f_idx <- sample(rf$num.trees, exp_B0)
+  y_hat <- rowMeans2(oob_preds[, f_idx, drop = FALSE], na.rm = TRUE)
+  if (type == 'regression') {
+    loss <- (y_hat - y)^2
+  } else {
+    loss <- -(y * log(y_hat) + (1 - y) * log(1 - y_hat))
+  }
+  
+  
+  ### Part II: Null forests ###
   drop <- function(j) {
     f0_idx <- !rf$forest$variable.selected[, j]
+    y_hat0 <- rowMeans2(oob_preds[, f0_idx, drop = FALSE], na.rm = TRUE)
     if (type == 'regression') {
-      y_hat0 <- rowMeans2(oob_preds[, f0_idx, drop = FALSE], na.rm = TRUE)
       loss0 <- (y_hat0 - y)^2
       if (weights) {
         inbag_cts <- simplify2array(rf$inbag.counts)
@@ -377,11 +379,6 @@ rf_split <- function(x,
                              inbag = inbag_cts[, f0_idx, drop = FALSE])$var.hat
       }
     } else {
-      if (type == 'probability') {
-        y_hat0 <- 1 - rowMeans2(oob_preds[, f0_idx, drop = FALSE], na.rm = TRUE)
-      } else if (type == 'classification') {
-        y_hat0 <- rowMeans2(oob_preds[, f0_idx, drop = FALSE], na.rm = TRUE)
-      }
       loss0 <- -(y * log(y_hat0) + (1 - y) * log(1 - y_hat0))
       if (weights) {
         inbag_cts <- simplify2array(rf$inbag.counts)
@@ -477,10 +474,12 @@ rf_split <- function(x,
   
 }
 
+
+
+
+
+
 # Problems, ideas:
 # Not sure how to extend this to multi-class problems (k > 2)?
-# Confidence intervals not working?
 # Extend to survival forests?
 # Need to revise cross entropy formula for factor inputs
-
-
