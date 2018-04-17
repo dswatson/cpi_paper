@@ -27,11 +27,11 @@ p <- 5000
 # Run 10 times
 delta <- foreach(b = seq_len(10), .combine = rbind) %do% sim(b, n, p)
 
-# How many p-values are <= 0.05?
-p <- sapply(seq_len(10), function(b) {
+# What proportion of p-values are <= 0.05?
+p_props <- sapply(seq_len(10), function(b) {
   sum(delta$p.value[delta$Run == b] <= 0.05) / p
 })
-p
+p_props
 
 # Let's see those t-statistics
 ggplot(delta, aes(t)) + 
@@ -58,11 +58,11 @@ sim <- function(b, n, p) {
 # Run 10 times
 delta <- foreach(b = seq_len(10), .combine = rbind) %do% sim(b, n, p)
 
-# How many p-values are <= 0.05?
-p <- sapply(seq_len(10), function(b) {
+# What proportion of p-values are <= 0.05?
+p_props <- sapply(seq_len(10), function(b) {
   sum(delta$p.value[delta$Run == b] <= 0.05) / p
 })
-p
+p_props
 
 # Let's see those t-statistics
 ggplot(delta, aes(t)) + 
