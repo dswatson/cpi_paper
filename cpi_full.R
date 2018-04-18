@@ -176,14 +176,13 @@ brute_force <- function(x,
         out <- c(out[1:2], out[1] + out[2] * q, out[1] - out[2] * q, out[3:4])
       }
     } else if (test == 'wilcox') {
-      if (!conf.int) {
-        w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater')
-        out <- c(mean(loss0 - loss), w_test$statistic, w_test$p.value)
-      } else {
-        w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater',
-                              conf.int = TRUE, conf.level = conf.level)
+      w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater',
+                            conf.int = conf.int, conf.level = conf.level)
+      if (conf.int) {
         out <- c(mean(loss0 - loss), w_test$conf.int[1], w_test$conf.int[2],
                  w_test$statistic, w_test$p.value)
+      } else {
+        out <- c(mean(loss0 - loss), w_test$statistic, w_test$p.value)
       }
     }
     
@@ -206,18 +205,18 @@ brute_force <- function(x,
       delta <- foreach(j = seq_len(p), .combine = rbind) %do% drop(j)
     }
     if (test == 't') {
-      if (!conf.int) {
-        dimnames(delta) <- list(NULL, c('CPI', 'SE', 't', 'p.value'))
+      if (conf.int) {
+        dimnames(delta) <- list(NULL, 
+                                c('CPI', 'SE', 'CI.L', 'CI.R', 't', 'p.value'))
       } else {
-        dimnames(delta) <- list(NULL, c('CPI', 'SE', 'CI_LB', 'CI_UB', 
-                                        't', 'p.value'))
+        dimnames(delta) <- list(NULL, c('CPI', 'SE', 't', 'p.value'))
       }
     } else if (test == 'wilcox') {
-      if (!conf.int) {
-        dimnames(delta) <- list(NULL, c('CPI', 'W', 'p.value'))
+      if (conf.int) {
+        dimnames(delta) <- list(NULL, 
+                                c('CPI', 'CI.L', 'CI.R', 'W', 'p.value'))
       } else {
-        dimnames(delta) <- list(NULL, c('CPI', 'CI_LB', 'CI_UB', 
-                                        'W', 'p.value'))
+        dimnames(delta) <- list(NULL, c('CPI', 'W', 'p.value'))
       }
     }
     delta <- data.frame(Feature = colnames(x), delta)
@@ -419,18 +418,18 @@ rf_split <- function(x,
       delta <- foreach(j = seq_len(p), .combine = rbind) %do% drop(j)
     }
     if (test == 't') {
-      if (!conf.int) {
-        dimnames(delta) <- list(NULL, c('CPI', 'SE', 't', 'p.value'))
+      if (conf.int) {
+        dimnames(delta) <- list(NULL, 
+                                c('CPI', 'SE', 'CI.L', 'CI.R', 't', 'p.value'))
       } else {
-        dimnames(delta) <- list(NULL, c('CPI', 'SE', 'CI_LB', 'CI_UB', 
-                                        't', 'p.value'))
+        dimnames(delta) <- list(NULL, c('CPI', 'SE', 't', 'p.value'))
       }
     } else if (test == 'wilcox') {
-      if (!conf.int) {
-        dimnames(delta) <- list(NULL, c('CPI', 'W', 'p.value'))
+      if (conf.int) {
+        dimnames(delta) <- list(NULL, 
+                                c('CPI', 'CI.L', 'CI.R', 'W', 'p.value'))
       } else {
-        dimnames(delta) <- list(NULL, c('CPI', 'CI_LB', 'CI_UB', 
-                                        'W', 'p.value'))
+        dimnames(delta) <- list(NULL, c('CPI', 'W', 'p.value'))
       }
     }
     delta <- data.frame(Feature = colnames(x), delta)
