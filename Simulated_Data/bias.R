@@ -83,23 +83,37 @@ ggplot(res, aes(Delta_Drop)) +
 # Specifically, we're curious about each variable's variance
 lapply(res, sd)
 
-# And indeed, it appears the drop-one method produces substantially larger
-# deltas (in absolute terms) than the random subsampling method
+# These look just about right. Are the means very different?
+t.test(res$Delta_Random, res$Delta_Drop)
 
-# But these null models aren't just *different* than their random counterparts 
-# ...they're worse
-risk <- data.frame(
-  y_hat0_rdm = res$Delta_Random + rep(y_hat, p),
-  y_hat0_drp = res$Delta_Drop + rep(y_hat, p)
-) %>%
+# Insignificantly so. Good! 
+
+# But do we still find greater empirical risk in delta_drop than in delta_random?
+risk <- data.frame(y_hat0_rdm = res$Delta_Random + rep(y_hat, p),
+                   y_hat0_drp = res$Delta_Drop + rep(y_hat, p)) %>%
   mutate(loss0_rdm = (rep(y, p) - y_hat0_rdm)^2,
          loss0_drp = (rep(y, p) - y_hat0_drp)^2,
              batch = rep(seq_len(p), each = n)) %>% 
   group_by(batch) %>%
-  summarize(emp_risk_rdm = mean(loss0_rdm),
-            emp_risk_drp = mean(loss0_drp))
-with(risk, t.test(emp_risk_drp, emp_risk_rdm, alternative = 'greater'))
+  summarize(Random = mean(loss0_rdm),
+            Drop = mean(loss0_drp))
+with(risk, t.test(Drop, Random, alternative = 'greater'))
 
+# Yes we do. The magnitude is not huge, but it is statistically significant,
+# at least with this many samples.
+risk %>%
+  ungroup(.) %>%
+  select(-batch) %>%
+  gather(key = 'Method') %>%
+  ggplot(aes(Method, value)) + 
+  geom_boxplot() + 
+  theme_bw()
+
+
+
+
+### This portion of the script just confirms that rf$forest$variable.selected
+### works (which it does!)
 
 # Random sub-forests with actual selection frequencies
 loop <- function(j) {
@@ -116,8 +130,10 @@ res$Delta_Random2 <- foreach(j = seq_len(p), .combine = c) %dopar% loop(j)
 lapply(res, sd)
 
 # Boxplot
-myres <- rbind(data.frame(Method = "Random", value = res$Delta_Random),
-               data.frame(Method = "Drop", value = res$Delta_Drop),
-               data.frame(Method = "Random2", value = res$Delta_Random2))
-ggplot(myres, aes(x = Method, y = value)) + 
-  geom_boxplot()
+gather(res, key = 'Method') %>%
+  ggplot(aes(x = Method, y = value)) + 
+  geom_boxplot() + 
+  theme_bw() 
+
+
+
