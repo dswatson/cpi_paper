@@ -90,8 +90,7 @@ with(out, t.test(Drop, Random, alternative = 'greater'))
 box <- function(b) {
   out %>%
     filter(Run == b) %>% 
-    select(-Run) %>%
-    gather(key = 'Method', value = 'Emp_Risk') %>%
+    gather(key = 'Method', value = 'Emp_Risk', -Run) %>%
     ggplot(aes(Method, Emp_Risk, fill = Method)) + 
     geom_boxplot() + 
     theme_bw()
@@ -101,8 +100,7 @@ box(2) # etc.
 
 # Overall boxplot
 out %>%
-  select(-Run) %>%
-  gather(key = 'Method', value = 'Emp_Risk') %>%
+  gather(key = 'Method', value = 'Emp_Risk', -Run) %>%
   ggplot(aes(Method, Emp_Risk, fill = Method)) + 
   geom_boxplot() + 
   theme_bw()
