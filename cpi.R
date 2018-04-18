@@ -397,14 +397,13 @@ rf_split <- function(x,
         out <- c(out[1:2], out[1] + out[2] * q, out[1] - out[2] * q, out[3:4])
       }
     } else if (test == 'wilcox') {
-      if (!conf.int) {
-        w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater')
-        out <- c(mean(loss0 - loss), w_test$statistic, w_test$p.value)
-      } else {
-        w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater',
-                              conf.int = TRUE, conf.level = conf.level)
+      w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater',
+                            conf.int = conf.int, conf.level = conf.level)
+      if (conf.int) {
         out <- c(mean(loss0 - loss), w_test$conf.int[1], w_test$conf.int[2],
                  w_test$statistic, w_test$p.value)
+      } else {
+        out <- c(mean(loss0 - loss), w_test$statistic, w_test$p.value)
       }
     }
     return(out)
