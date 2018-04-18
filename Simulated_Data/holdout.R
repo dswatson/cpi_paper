@@ -30,12 +30,15 @@ sim <- function(b, n, p) {
   rf2 <- ranger(data = df2, dependent.variable.name = 'y', 
                 mtry = mtry, num.trees = B, replace = TRUE,
                 num.threads = 20, seed = b)
-  preds1 <- predict(rf1, data = df2, num.threads = 20, predict.all = TRUE)
-  preds2 <- predict(rf2, data = df1, num.threads = 20, predict.all = TRUE)
+  preds1 <- predict(rf1, data = df2, num.threads = 20, 
+                    predict.all = TRUE)$predictions
+  preds2 <- predict(rf2, data = df1, num.threads = 20, 
+                    predict.all = TRUE)$predictions
   y_hat1 <- rowMeans2(preds1)
   y_hat2 <- rowMeans2(preds2)
   loss1 <- (df2$y - y_hat1)^2
   loss2 <- (df1$y - y_hat2)^2
+  loss <- c(loss1, loss2)
   
   # Drop function
   drop <- function(j) {
@@ -45,7 +48,7 @@ sim <- function(b, n, p) {
     f0_idx2 <- !rf2$forest$variable.selected[, j]
     y_hat02 <- rowMeans2(preds2[, f0_idx2, drop = FALSE])
     loss02 <- (df1$y - y_hat02)^2
-    loss0 <- (loss01 + loss02) / 2
+    loss0 <- c(loss01, loss02)
     t_test <- t.test(loss0, loss, paired = TRUE, alternative = 'greater')
     out <- c(t_test$estimate, t_test$estimate / t_test$statistic,
              t_test$statistic, t_test$p.value)
@@ -55,7 +58,8 @@ sim <- function(b, n, p) {
   # Execute in parallel, export
   delta <- foreach(j = seq_len(p), .combine = rbind) %dopar% drop(j)
   dimnames(delta) <- list(NULL, c('CPI', 'SE', 't', 'p.value'))
-  delta <- data.frame(Feature = paste0('x', seq_len(p)), delta)
+  delta <- data.frame(Feature = paste0('x', seq_len(p)), delta) %>%
+    mutate(Run = b)
   return(delta)
   
 }
