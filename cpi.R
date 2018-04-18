@@ -4,6 +4,7 @@ brute_force <- function(x,
                         type = 'regression', 
                         test = 't',
                         conf.int = FALSE,
+                        conf.level = 0.95,
                         weights = FALSE,
                         p.adj = NULL, 
                         mtry = NULL, 
@@ -164,26 +165,15 @@ brute_force <- function(x,
                          Model = rep(c('Full', 'Null'), each = n),
                          Obs = rep(paste0('n', seq_len(n)), times = 2))
         s <- summary(lm(Loss ~ Model + Obs, weights = Wts, data = df))
-        if (!conf.int) {
-          out <- c(coef(s)[2, 1:3], pt(coef(s)[2, 3], s$df[2], lower = FALSE))
-        } else {
-          cint <- c(coef(s)[2, 3] - qt(conf.int, s$df[2]), Inf)
-          cint <- coef(s)[2, 1] + cint * coef(s)[2, 2]
-          out <- c(coef(s)[2, 1:2], cint[1], cint[2], coef(s)[2, 3], 
-                   pt(coef(s)[2, 3], s$df[2], lower = FALSE))
-        }
+        out <- c(coef(s)[2, 1:3], pt(coef(s)[2, 3], s$df[2], lower = FALSE))
       } else {
-        if (!conf.int) {
-          t_test <- t.test(loss0, loss, paired = TRUE, alternative = 'greater')
-          out <- c(t_test$estimate, t_test$estimate / t_test$statistic,
-                   t_test$statistic, t_test$p.value)
-        } else {
-          t_test <- t.test(loss0, loss, paired = TRUE, alternative = 'greater',
-                           conf.level = conf.int)
-          out <- c(t_test$estimate, t_test$estimate / t_test$statistic,
-                   t_test$conf.int[1], t_test$conf.int[2],
-                   t_test$statistic, t_test$p.value)
-        }
+        t_test <- t.test(loss0, loss, paired = TRUE, alternative = 'greater')
+        out <- c(t_test$estimate, t_test$estimate / t_test$statistic,
+                 t_test$statistic, t_test$p.value)
+      }
+      if (conf.int) {
+        q <- qnorm(1 - (1 - conf.level) / 2)
+        out <- c(out[1:2], out[1] + out[2] * q, out[1] - out[2] * q, out[3:4])
       }
     } else if (test == 'wilcox') {
       if (!conf.int) {
@@ -191,7 +181,7 @@ brute_force <- function(x,
         out <- c(mean(loss0 - loss), w_test$statistic, w_test$p.value)
       } else {
         w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater',
-                              conf.int = TRUE, conf.level = conf.int)
+                              conf.int = TRUE, conf.level = conf.level)
         out <- c(mean(loss0 - loss), w_test$conf.int[1], w_test$conf.int[2],
                  w_test$statistic, w_test$p.value)
       }
@@ -252,6 +242,7 @@ rf_split <- function(x,
                      type = 'regression', 
                      test = 't',
                      conf.int = FALSE,
+                     conf.level = 0.95,
                      weights = FALSE,
                      p.adj = NULL,
                      mtry = NULL, 
@@ -395,26 +386,15 @@ rf_split <- function(x,
                          Model = rep(c('Full', 'Null'), each = n),
                          Obs = rep(paste0('n', seq_len(n)), times = 2))
         s <- summary(lm(Loss ~ Model + Obs, weights = Wts, data = df))
-        if (!conf.int) {
-          out <- c(coef(s)[2, 1:3], pt(coef(s)[2, 3], s$df[2], lower = FALSE))
-        } else {
-          cint <- c(coef(s)[2, 3] - qt(conf.int, s$df[2]), Inf)
-          cint <- coef(s)[2, 1] + cint * coef(s)[2, 2]
-          out <- c(coef(s)[2, 1:2], cint[1], cint[2], coef(s)[2, 3], 
-                   pt(coef(s)[2, 3], s$df[2], lower = FALSE))
-        }
+        out <- c(coef(s)[2, 1:3], pt(coef(s)[2, 3], s$df[2], lower = FALSE))
       } else {
-        if (!conf.int) {
-          t_test <- t.test(loss0, loss, paired = TRUE, alternative = 'greater')
-          out <- c(t_test$estimate, t_test$estimate / t_test$statistic,
-                   t_test$statistic, t_test$p.value)
-        } else {
-          t_test <- t.test(loss0, loss, paired = TRUE, alternative = 'greater',
-                           conf.level = conf.int)
-          out <- c(t_test$estimate, t_test$estimate / t_test$statistic,
-                   t_test$conf.int[1], t_test$conf.int[2],
-                   t_test$statistic, t_test$p.value)
-        }
+        t_test <- t.test(loss0, loss, paired = TRUE, alternative = 'greater')
+        out <- c(t_test$estimate, t_test$estimate / t_test$statistic,
+                 t_test$statistic, t_test$p.value)
+      }
+      if (conf.int) {
+        q <- qnorm(1 - (1 - conf.level) / 2)
+        out <- c(out[1:2], out[1] + out[2] * q, out[1] - out[2] * q, out[3:4])
       }
     } else if (test == 'wilcox') {
       if (!conf.int) {
@@ -422,7 +402,7 @@ rf_split <- function(x,
         out <- c(mean(loss0 - loss), w_test$statistic, w_test$p.value)
       } else {
         w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater',
-                              conf.int = TRUE, conf.level = conf.int)
+                              conf.int = TRUE, conf.level = conf.level)
         out <- c(mean(loss0 - loss), w_test$conf.int[1], w_test$conf.int[2],
                  w_test$statistic, w_test$p.value)
       }
