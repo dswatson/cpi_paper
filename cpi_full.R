@@ -383,6 +383,7 @@ rf_split <- function(x,
         s <- summary(lm(Loss ~ Model + Obs, weights = Wts, data = df))
         out <- c(coef(s)[2, 1:3], pt(coef(s)[2, 3], s$df[2], lower = FALSE))
       } else {
+        t_test <- t.test(loss0, loss, paired = TRUE, alternative = 'greater')
         out <- c(t_test$estimate, t_test$estimate / t_test$statistic,
                  t_test$statistic, t_test$p.value)
       }
