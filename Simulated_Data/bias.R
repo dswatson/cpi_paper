@@ -88,7 +88,7 @@ t.test(res$Delta_Random, res$Delta_Drop)
 
 # Insignificantly so. Good! 
 
-# But do we still find greater empirical risk in delta_drop than in delta_random?
+# But do we still find greater empirical risk with the drop method?
 risk <- data.frame(y_hat0_rdm = res$Delta_Random + rep(y_hat, p),
                    y_hat0_drp = res$Delta_Drop + rep(y_hat, p)) %>%
   mutate(loss0_rdm = (rep(y, p) - y_hat0_rdm)^2,
@@ -96,24 +96,24 @@ risk <- data.frame(y_hat0_rdm = res$Delta_Random + rep(y_hat, p),
              batch = rep(seq_len(p), each = n)) %>% 
   group_by(batch) %>%
   summarize(Random = mean(loss0_rdm),
-            Drop = mean(loss0_drp))
+              Drop = mean(loss0_drp))
 with(risk, t.test(Drop, Random, alternative = 'greater'))
 
-# Yes we do. The magnitude is not huge, but it is statistically significant,
+# Yes we do. The difference is not huge, but it is statistically significant,
 # at least with this many samples.
 risk %>%
-  ungroup(.) %>%
   select(-batch) %>%
-  gather(key = 'Method') %>%
-  ggplot(aes(Method, value)) + 
+  gather(key = 'Method', value = 'Emp_Risk') %>%
+  ggplot(aes(Method, Emp_Risk, fill = Method)) + 
   geom_boxplot() + 
   theme_bw()
 
 
 
 
+
 ### This portion of the script just confirms that rf$forest$variable.selected
-### works (which it does!)
+### works properly (which it does!)
 
 # Random sub-forests with actual selection frequencies
 loop <- function(j) {
