@@ -28,10 +28,9 @@ p <- 5000
 delta <- foreach(b = seq_len(10), .combine = rbind) %do% sim(b, n, p)
 
 # What proportion of p-values are <= 0.05?
-p_props <- sapply(seq_len(10), function(b) {
+(p_props <- sapply(seq_len(10), function(b) {
   sum(delta$p.value[delta$Run == b] <= 0.05) / p
-})
-p_props
+}))
 
 # Let's see those t-statistics
 ggplot(delta, aes(t)) + 
@@ -59,10 +58,9 @@ sim <- function(b, n, p) {
 delta <- foreach(b = seq_len(10), .combine = rbind) %do% sim(b, n, p)
 
 # What proportion of p-values are <= 0.05?
-p_props <- sapply(seq_len(10), function(b) {
+(p_props <- sapply(seq_len(10), function(b) {
   sum(delta$p.value[delta$Run == b] <= 0.05) / p
-})
-p_props
+}))
 
 # Let's see those t-statistics
 ggplot(delta, aes(t)) + 
@@ -73,5 +71,17 @@ ggplot(delta, aes(t)) +
 # Results from the latter look more stable and less biased
 # ...but still biased!
 
+# Another helpful visualization is a QQ plot of p-values
+data.frame(Observed = -log10(sort(delta$p.value)),
+           Expected = -log10(ppoints(nrow(delta)))) %>%
+  ggplot(aes(Expected, Observed)) + 
+  geom_point(size = 0.5) + 
+  geom_abline(intercept = 0, slope = 1, color = 'red') + 
+  labs(x = expression('Expected'~-log[10](italic(p))),
+       y = expression('Observed'~-log[10](italic(p)))) +
+  theme_bw()
 
+# Inflation factor?
+chisq <- qchisq(p = 1 - delta$p.value, df = 1)
+(lambda <- median(chisq) / qchisq(p = 0.5, df = 1))
 

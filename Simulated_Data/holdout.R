@@ -43,10 +43,10 @@ sim <- function(b, n, p) {
   # Drop function
   drop <- function(j) {
     f0_idx1 <- !rf1$forest$variable.selected[, j]
-    y_hat01 <- rowMeans2(preds1[, f0_idx1, drop = FALSE])
-    loss01 <- (df2$y - y_hat01)^2
     f0_idx2 <- !rf2$forest$variable.selected[, j]
+    y_hat01 <- rowMeans2(preds1[, f0_idx1, drop = FALSE])
     y_hat02 <- rowMeans2(preds2[, f0_idx2, drop = FALSE])
+    loss01 <- (df2$y - y_hat01)^2
     loss02 <- (df1$y - y_hat02)^2
     loss0 <- c(loss01, loss02)
     t_test <- t.test(loss0, loss, paired = TRUE, alternative = 'greater')
@@ -58,8 +58,11 @@ sim <- function(b, n, p) {
   # Execute in parallel, export
   delta <- foreach(j = seq_len(p), .combine = rbind) %dopar% drop(j)
   dimnames(delta) <- list(NULL, c('CPI', 'SE', 't', 'p.value'))
-  delta <- data.frame(Feature = paste0('x', seq_len(p)), delta) %>%
-    mutate(Run = b)
+  delta <- data.frame(
+    Feature = paste0('x', seq_len(p)), 
+    delta,
+    Run = b
+  )
   return(delta)
   
 }
@@ -70,10 +73,9 @@ p <- 5000
 delta <- foreach(b = seq_len(10), .combine = rbind) %do% sim(b, n, p)
 
 # What proportion of p-values are <= 0.05?
-p_props <- sapply(seq_len(10), function(b) {
+(p_props <- sapply(seq_len(10), function(b) {
   sum(delta$p.value[delta$Run == b] <= 0.05) / p
-})
-p_props
+}))
 
 # Let's see those t-statistics
 ggplot(delta, aes(t)) + 
@@ -81,6 +83,27 @@ ggplot(delta, aes(t)) +
   stat_function(fun = dt, color = 'red', args = list(df = n - 1)) + 
   theme_bw()
 
+# Very different results across the various runs
+(bias_p <- sapply(seq_len(10), function(b) {
+  t.test(delta$CPI[delta$Run == b], alternative = 'greater')$p.value
+}))
+
+# But overall, the bias is significant
+t.test(delta$CPI, alternative = 'greater')
+
+# Also evident in the p-value distribution
+data.frame(Observed = -log10(sort(delta$p.value)),
+           Expected = -log10(ppoints(nrow(delta)))) %>%
+  ggplot(aes(Expected, Observed)) + 
+  geom_point(size = 0.5) + 
+  geom_abline(intercept = 0, slope = 1, color = 'red') + 
+  labs(x = expression('Expected'~-log[10](italic(p))),
+       y = expression('Observed'~-log[10](italic(p)))) +
+  theme_bw()
+
+# Inflation factor?
+chisq <- qchisq(p = 1 - delta$p.value, df = 1)
+(lambda <- median(chisq) / qchisq(p = 0.5, df = 1))
 
 
 
