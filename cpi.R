@@ -176,17 +176,21 @@ brute_force <- function(x,
       out <- c(mean(loss0 - loss), w_test$statistic, w_test$p.value)
     }
     if (conf.int) {
-      delta <- loss0 - loss
-      se <- sd(delta) / sqrt(n)
       q <- qnorm(1 - (1 - conf.level) / 2)
-      lower <- mean(delta) - se * q
-      upper <- mean(delta) + se * q
-      if (is.null(test)) {
-        out <- c(out, lower, upper)
-      } else if (test == 't') {
-        out <- c(out[1:2], lower, upper, out[3:4])
-      } else if (test == 'wilcox') {
-        out <- c(out[1], lower, upper, out[2:3])
+      if (weights) {
+        out <- c(out[1:2], out[1] - out[2] * q, out[1] + out[2] * q, out[3:4])
+      } else {
+        delta <- loss0 - loss
+        se <- sd(delta) / sqrt(n)
+        lower <- mean(delta) - se * q
+        upper <- mean(delta) + se * q
+        if (is.null(test)) {
+          out <- c(out, lower, upper)
+        } else if (test == 't') {
+          out <- c(out[1:2], lower, upper, out[3:4])
+        } else if (test == 'wilcox') {
+          out <- c(out[1], lower, upper, out[2:3])
+        }
       }
     }
     
@@ -403,17 +407,21 @@ rf_split <- function(x,
       out <- c(mean(loss0 - loss), w_test$statistic, w_test$p.value)
     }
     if (conf.int) {
-      delta <- loss0 - loss
-      se <- sd(delta) / sqrt(n)
       q <- qnorm(1 - (1 - conf.level) / 2)
-      lower <- mean(delta) - se * q
-      upper <- mean(delta) + se * q
-      if (is.null(test)) {
-        out <- c(out, lower, upper)
-      } else if (test == 't') {
-        out <- c(out[1:2], lower, upper, out[3:4])
-      } else if (test == 'wilcox') {
-        out <- c(out[1], lower, upper, out[2:3])
+      if (weights) {
+        out <- c(out[1:2], out[1] - out[2] * q, out[1] + out[2] * q, out[3:4])
+      } else {
+        delta <- loss0 - loss
+        se <- sd(delta) / sqrt(n)
+        lower <- mean(delta) - se * q
+        upper <- mean(delta) + se * q
+        if (is.null(test)) {
+          out <- c(out, lower, upper)
+        } else if (test == 't') {
+          out <- c(out[1:2], lower, upper, out[3:4])
+        } else if (test == 'wilcox') {
+          out <- c(out[1], lower, upper, out[2:3])
+        }
       }
     }
     return(out)
