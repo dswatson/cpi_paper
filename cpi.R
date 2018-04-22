@@ -260,7 +260,6 @@ rf_split <- function(x,
   require(ranger)
   require(matrixStats)
   require(foreach)
-  source('infinitesimalJackknife.R')
   n <- nrow(x)
   p <- ncol(x)
   if (type == 'regression') {
@@ -318,7 +317,7 @@ rf_split <- function(x,
                  classification = TRUE)
     # Create n x B matrix of predictions
     preds <- predict(rf, df, num.threads = n.cores,
-                     predict.all = TRUE)$predictions 
+                     predict.all = TRUE)$predictions - 1
   }
   # Create oob_preds object
   oob_idx <- ifelse(simplify2array(rf$inbag.counts) == 0, TRUE, NA)
@@ -358,6 +357,8 @@ rf_split <- function(x,
     }
     return(c(loss, wts))
   }
+  
+  # Optionally execute in parallel
   if (n.cores > 1) {
     subs <- rowMeans2(foreach(b = seq_len(n.sub), .combine = cbind) %dopar% sub_forest(b))
   } else {
