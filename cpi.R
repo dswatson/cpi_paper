@@ -81,7 +81,7 @@ brute_force <- function(x,
                      probability = TRUE)
       }
       # Extract probabilities
-      y_hat <- sapply(rf$predictions, '[[', 1)
+      y_hat <- rf$predictions[, 1]
     } else if (type == 'classification') {
       # Grow full forest
       rf <- ranger(data = df, dependent.variable.name = 'y', 
@@ -139,7 +139,7 @@ brute_force <- function(x,
                         probability = TRUE) 
         }
         # Extract probabilities
-        y_hat0 <- sapply(f0$predictions, '[[', 1)
+        y_hat0 <- f0$predictions[, 1]
       } else if (type == 'classification') {
         # Grow forest
         rf0 <- ranger(data = df0, dependent.variable.name = 'y',
@@ -171,18 +171,22 @@ brute_force <- function(x,
         out <- c(t_test$estimate, t_test$estimate / t_test$statistic,
                  t_test$statistic, t_test$p.value)
       }
-      if (conf.int) {
-        q <- qnorm(1 - (1 - conf.level) / 2)
-        out <- c(out[1:2], out[1] + out[2] * q, out[1] - out[2] * q, out[3:4])
-      }
     } else if (test == 'wilcox') {
-      w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater',
-                            conf.int = conf.int, conf.level = conf.level)
-      if (conf.int) {
-        out <- c(mean(loss0 - loss), w_test$conf.int[1], w_test$conf.int[2],
-                 w_test$statistic, w_test$p.value)
-      } else {
-        out <- c(mean(loss0 - loss), w_test$statistic, w_test$p.value)
+      w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater')
+      out <- c(mean(loss0 - loss), w_test$statistic, w_test$p.value)
+    }
+    if (conf.int) {
+      delta <- loss0 - loss
+      se <- sd(delta) / sqrt(n)
+      q <- qnorm(1 - (1 - conf.level) / 2)
+      lower <- mean(delta) - se * q
+      upper <- mean(delta) + se * q
+      if (is.null(test)) {
+        out <- c(out, lower, upper)
+      } else if (test == 't') {
+        out <- c(out[1:2], lower, upper, out[3:4])
+      } else if (test == 'wilcox') {
+        out <- c(out[1], lower, upper, out[2:3])
       }
     }
     
@@ -191,47 +195,47 @@ brute_force <- function(x,
   }
   
   # Optionally execute in parallel
-  if (is.null(test)) {
+  if (is.null(test) & !conf.int) {
     if (n.cores > 1) {
-      delta <- foreach(j = seq_len(p), .combine = c) %dopar% drop(j)
+      res <- foreach(j = seq_len(p), .combine = c) %dopar% drop(j)
     } else {
-      delta <- foreach(j = seq_len(p), .combine = c) %do% drop(j)
+      res <- foreach(j = seq_len(p), .combine = c) %do% drop(j)
     }
-    names(delta) <- colnames(x)
+    names(res) <- colnames(x)
   } else {
     if (n.cores > 1) {
-      delta <- foreach(j = seq_len(p), .combine = rbind) %dopar% drop(j)
+      res <- foreach(j = seq_len(p), .combine = rbind) %dopar% drop(j)
     } else {
-      delta <- foreach(j = seq_len(p), .combine = rbind) %do% drop(j)
+      res <- foreach(j = seq_len(p), .combine = rbind) %do% drop(j)
+    }
+    if (is.null(test) & conf.int) {
+      dimnames(res) <- list(NULL, c('CPI', 'CI.L', 'CI.R'))
     }
     if (test == 't') {
       if (conf.int) {
-        dimnames(delta) <- list(NULL, 
-                                c('CPI', 'SE', 'CI.L', 'CI.R', 't', 'p.value'))
+        dimnames(res) <- list(NULL, c('CPI', 'SE', 'CI.L', 'CI.R', 't', 'p.value'))
       } else {
-        dimnames(delta) <- list(NULL, c('CPI', 'SE', 't', 'p.value'))
+        dimnames(res) <- list(NULL, c('CPI', 'SE', 't', 'p.value'))
       }
     } else if (test == 'wilcox') {
       if (conf.int) {
-        dimnames(delta) <- list(NULL, 
-                                c('CPI', 'CI.L', 'CI.R', 'W', 'p.value'))
+        dimnames(res) <- list(NULL, c('CPI', 'CI.L', 'CI.R', 'W', 'p.value'))
       } else {
-        dimnames(delta) <- list(NULL, c('CPI', 'W', 'p.value'))
+        dimnames(res) <- list(NULL, c('CPI', 'W', 'p.value'))
       }
     }
-    delta <- data.frame(Feature = colnames(x), delta)
+    res <- data.frame(Feature = colnames(x), res)
   }
   
   # Adjust p-values?
   if (!is.null(p.adj) & !is.null(test)) {
     if (p.adj %in% c('fdr', 'BH')) {
-      delta$q.value <- p.adjust(delta$p.value, method = 'fdr')
+      res$q.value <- p.adjust(res$p.value, method = 'fdr')
     } else {
-      delta$adj.p.value <- p.adjust(delta$p.value, method = p.adj)
+      res$adj.p.value <- p.adjust(res$p.value, method = p.adj)
     }
   }
-  # Export
-  return(delta)
+  return(res)
   
 }
 
@@ -247,6 +251,7 @@ rf_split <- function(x,
                      mtry = NULL, 
                      B = NULL, 
                      B0 = NULL, 
+                     n.sub = 100,
                      replace = TRUE,
                      n.cores = 1, 
                      seed = NULL) {
@@ -255,6 +260,7 @@ rf_split <- function(x,
   require(ranger)
   require(matrixStats)
   require(foreach)
+  source('infinitesimalJackknife.R')
   n <- nrow(x)
   p <- ncol(x)
   if (type == 'regression') {
@@ -262,12 +268,9 @@ rf_split <- function(x,
   } else {
     df <- data.frame(x, 'y' = as.factor(y))
   }
-  if (type != 'regression') {
-    df$y <- as.factor(df$y)
-  }
   if (is.null(mtry)) {
     if (type == 'regression') {
-      mtry <- floor(p/3)
+      mtry <- floor(p / 3)
     } else {
       mtry <- floor(sqrt(p))
     }
@@ -291,45 +294,36 @@ rf_split <- function(x,
   
   ### Part I: Full forest ###
   if (type == 'regression') {
-    # Grow full forest
+    # Grow forest
     rf <- ranger(data = df, dependent.variable.name = 'y', 
                  mtry = mtry, num.trees = B, replace = replace,
                  keep.inbag = TRUE, num.threads = n.cores, seed = seed)
-    if (weights) {  
-      # Calculate sample-wise precision
-      wts <- 1 / predict(rf, data = df, num.threads = n.cores,
-                         type = 'se')$se^2
-    }
+    # Create n x B matrix of predictions
     preds <- predict(rf, data = df, num.threads = n.cores,
                      predict.all = TRUE)$predictions 
-  } else {
-    if (type == 'probability') {
-      # Grow full forest
-      rf <- ranger(data = df, dependent.variable.name = 'y', 
-                   mtry = mtry, num.trees = B, replace = replace,
-                   keep.inbag = TRUE, num.threads = n.cores, seed = seed,
-                   probability = TRUE)
-      if (weights) {
-        # Calculate sample-wise precision
-        wts <- 1 / predict(rf, data = df, num.threads = n.cores,
-                           type = 'se')$se[, 1]^2
-      } 
-      # Extract probabilities
-      preds <- predict(rf, data = df, num.threads = n.cores,
-                       predict.all = TRUE)$predictions[, 1, ]
-    } else if (type == 'classification') {
-      # Grow full forest
-      rf <- ranger(data = df, dependent.variable.name = 'y', 
-                   mtry = mtry, num.trees = B, replace = replace,
-                   keep.inbag = TRUE, num.threads = n.cores, seed = seed,
-                   classification = TRUE)
-      # Extract probabilities
-      oob_idx <- ifelse(simplify2array(rf$inbag.counts) == 0, TRUE, NA)
-      preds <- predict(rf, df, num.threads = n.cores,
-                       predict.all = TRUE)$predictions - 1
-    }
+  } else if (type == 'probability') {
+    # Grow forest
+    rf <- ranger(data = df, dependent.variable.name = 'y', 
+                 mtry = mtry, num.trees = B, replace = replace,
+                 keep.inbag = TRUE, num.threads = n.cores, seed = seed,
+                 probability = TRUE)
+    # Create n x B matrix of predictions
+    preds <- predict(rf, data = df, num.threads = n.cores,
+                     predict.all = TRUE)$predictions[, 1, ]
+  } else if (type == 'classification') {
+    # Grow forest
+    rf <- ranger(data = df, dependent.variable.name = 'y', 
+                 mtry = mtry, num.trees = B, replace = replace,
+                 keep.inbag = TRUE, num.threads = n.cores, seed = seed,
+                 classification = TRUE)
+    # Create n x B matrix of predictions
+    preds <- predict(rf, df, num.threads = n.cores,
+                     predict.all = TRUE)$predictions 
   }
-  
+  # Create oob_preds object
+  oob_idx <- ifelse(simplify2array(rf$inbag.counts) == 0, TRUE, NA)
+  oob_preds <- oob_idx * preds
+
   # Determine if forest splitting is appropriate
   if (n.cores > 1) {
     splits <- foreach(b = seq_len(B), .combine = c) %dopar% 
@@ -345,17 +339,34 @@ rf_split <- function(x,
          ', less than the minimum of ', B0, '.')
   }
   
-  # Loss with random sample of trees
-  oob_idx <- ifelse(simplify2array(rf$inbag.counts) == 0, TRUE, NA)
-  oob_preds <- oob_idx * preds
-  f_idx <- sample(rf$num.trees, exp_B0)
-  y_hat <- rowMeans2(oob_preds[, f_idx, drop = FALSE], na.rm = TRUE)
-  if (type == 'regression') {
-    loss <- (y_hat - y)^2
-  } else {
-    loss <- -(y * log(y_hat) + (1 - y) * log(1 - y_hat))
+  # Calculate loss from random sub-forests
+  sub_forest <- function(b) {
+    set.seed(b)
+    sub_idx <- sample.int(B, exp_B0)
+    y_hat <- rowMeans2(oob_preds[, sub_idx, drop = FALSE], na.rm = TRUE)
+    if (type == 'regression') {
+      loss <- (y_hat - y)^2
+    } else if (type %in% c('probability', 'classification')) {
+      loss <- -(y * log(y_hat) + (1 - y) * log(1 - y_hat))
+    }
+    if (weights) {
+      inbag_cts <- simplify2array(rf$inbag.counts)
+      wts <- 1 / rInfJack(pred = preds[, sub_idx, drop = FALSE], 
+                          inbag = inbag_cts[, sub_idx, drop = FALSE])$var.hat
+    } else {
+      wts <- rep(NA_real_, n)
+    }
+    return(c(loss, wts))
   }
-  
+  if (n.cores > 1) {
+    subs <- rowMeans2(foreach(b = seq_len(n.sub), .combine = cbind) %dopar% sub_forest(b))
+  } else {
+    subs <- rowMeans2(foreach(b = seq_len(n.sub), .combine = cbind) %do% sub_forest(b))
+  }
+  loss <- subs[seq_len(n)]
+  if (weights) {
+    wts <- subs[(n + 1):(2 * n)]
+  }
   
   ### Part II: Null forests ###
   drop <- function(j) {
@@ -363,18 +374,13 @@ rf_split <- function(x,
     y_hat0 <- rowMeans2(oob_preds[, f0_idx, drop = FALSE], na.rm = TRUE)
     if (type == 'regression') {
       loss0 <- (y_hat0 - y)^2
-      if (weights) {
-        inbag_cts <- simplify2array(rf$inbag.counts)
-        wts0 <- 1 / rInfJack(pred = preds[, f0_idx, drop = FALSE], 
-                             inbag = inbag_cts[, f0_idx, drop = FALSE])$var.hat
-      }
     } else {
       loss0 <- -(y * log(y_hat0) + (1 - y) * log(1 - y_hat0))
-      if (weights) {
-        inbag_cts <- simplify2array(rf$inbag.counts)
-        wts0 <- 1 / rInfJack(pred = preds[, f0_idx, drop = FALSE], 
-                             inbag = inbag_cts[, f0_idx, drop = FALSE])$var.hat
-      }
+    }
+    if (weights) {
+      inbag_cts <- simplify2array(rf$inbag.counts)
+      wts0 <- 1 / rInfJack(pred = preds[, f0_idx, drop = FALSE], 
+                           inbag = inbag_cts[, f0_idx, drop = FALSE])$var.hat
     }
     if (is.null(test)) {
       out <- mean(loss0 - loss)
@@ -391,64 +397,69 @@ rf_split <- function(x,
         out <- c(t_test$estimate, t_test$estimate / t_test$statistic,
                  t_test$statistic, t_test$p.value)
       }
-      if (conf.int) {
-        q <- qnorm(1 - (1 - conf.level) / 2)
-        out <- c(out[1:2], out[1] + out[2] * q, out[1] - out[2] * q, out[3:4])
-      }
     } else if (test == 'wilcox') {
-      w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater',
-                            conf.int = conf.int, conf.level = conf.level)
-      if (conf.int) {
-        out <- c(mean(loss0 - loss), w_test$conf.int[1], w_test$conf.int[2],
-                 w_test$statistic, w_test$p.value)
-      } else {
-        out <- c(mean(loss0 - loss), w_test$statistic, w_test$p.value)
+      w_test <- wilcox.test(loss0, loss, paired = TRUE, alternative = 'greater')
+      out <- c(mean(loss0 - loss), w_test$statistic, w_test$p.value)
+    }
+    if (conf.int) {
+      delta <- loss0 - loss
+      se <- sd(delta) / sqrt(n)
+      q <- qnorm(1 - (1 - conf.level) / 2)
+      lower <- mean(delta) - se * q
+      upper <- mean(delta) + se * q
+      if (is.null(test)) {
+        out <- c(out, lower, upper)
+      } else if (test == 't') {
+        out <- c(out[1:2], lower, upper, out[3:4])
+      } else if (test == 'wilcox') {
+        out <- c(out[1], lower, upper, out[2:3])
       }
     }
     return(out)
   }
   
   # Optionally execute in parallel
-  if (is.null(test)) {
+  if (is.null(test) & !conf.int) {
     if (n.cores > 1) {
-      delta <- foreach(j = seq_len(p), .combine = c) %dopar% drop(j)
+      res <- foreach(j = seq_len(p), .combine = c) %dopar% drop(j)
     } else {
-      delta <- foreach(j = seq_len(p), .combine = c) %do% drop(j)
+      res <- foreach(j = seq_len(p), .combine = c) %do% drop(j)
     }
-    names(delta) <- colnames(x)
+    names(res) <- colnames(x)
   } else {
     if (n.cores > 1) {
-      delta <- foreach(j = seq_len(p), .combine = rbind) %dopar% drop(j)
+      res <- foreach(j = seq_len(p), .combine = rbind) %dopar% drop(j)
     } else {
-      delta <- foreach(j = seq_len(p), .combine = rbind) %do% drop(j)
+      res <- foreach(j = seq_len(p), .combine = rbind) %do% drop(j)
+    }
+    if (is.null(test) & conf.int) {
+      dimnames(res) <- list(NULL, c('CPI', 'CI.L', 'CI.R'))
     }
     if (test == 't') {
       if (conf.int) {
-        dimnames(delta) <- list(NULL, 
-                                c('CPI', 'SE', 'CI.L', 'CI.R', 't', 'p.value'))
+        dimnames(res) <- list(NULL, c('CPI', 'SE', 'CI.L', 'CI.R', 't', 'p.value'))
       } else {
-        dimnames(delta) <- list(NULL, c('CPI', 'SE', 't', 'p.value'))
+        dimnames(res) <- list(NULL, c('CPI', 'SE', 't', 'p.value'))
       }
     } else if (test == 'wilcox') {
       if (conf.int) {
-        dimnames(delta) <- list(NULL, 
-                                c('CPI', 'CI.L', 'CI.R', 'W', 'p.value'))
+        dimnames(res) <- list(NULL, c('CPI', 'CI.L', 'CI.R', 'W', 'p.value'))
       } else {
-        dimnames(delta) <- list(NULL, c('CPI', 'W', 'p.value'))
+        dimnames(res) <- list(NULL, c('CPI', 'W', 'p.value'))
       }
     }
-    delta <- data.frame(Feature = colnames(x), delta)
+    res <- data.frame(Feature = colnames(x), res)
   }
   
   # Adjust p-values?
   if (!is.null(p.adj) & !is.null(test)) {
     if (p.adj %in% c('fdr', 'BH')) {
-      delta$q.value <- p.adjust(delta$p.value, method = 'fdr')
+      res$q.value <- p.adjust(res$p.value, method = 'fdr')
     } else {
-      delta$adj.p.value <- p.adjust(delta$p.value, method = p.adj)
+      res$adj.p.value <- p.adjust(res$p.value, method = p.adj)
     }
   }
-  return(delta)
+  return(res)
   
 }
 
