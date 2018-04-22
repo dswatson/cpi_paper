@@ -62,12 +62,54 @@ sim <- function(b, n, p) {
 # Simulate data
 n <- 100
 p <- 5000
-out <- sim(1, n, p)
+out <- foreach(b = seq_len(100), .combine = rbind) %do% sim(b, n, p)
+saveRDS(out, 'cpi_rdm_subset.rds')
 
+# This looks pretty darn good to me
+ggplot(out, aes(t)) + 
+  geom_histogram(aes(y = ..density..), bins = 100, color = 'black') + 
+  stat_function(fun = dt, color = 'red', args = list(df = 99)) + 
+  theme_bw()
+
+# Although a QQ plot suggests there's a slight mismatch at the tails
+n_out <- nrow(out)
+data_frame(Observed = quantile(out$t, probs = ppoints(n_out)),
+           Expected = qt(ppoints(n_out), df = 99)) %>%
+  ggplot(aes(Expected, Observed)) + 
+  geom_point(size = 0.25) + 
+  geom_abline(intercept = 0, slope = 1, color = 'red') + 
+  labs(x = 'Expected Quantiles', y = 'Observed Quantiles') + 
+  theme_bw()
+
+# Annoyingly, a t-test still indicates a slight upward bias in CPI
+t.test(out$CPI, alternative = 'greater')
+
+# But a KS-test fails to reject the null hypothesis that our observed t-stats
+# were sampled from the expected distribution
+ks.test(out$t, 'pt', df = 99, alternative = 'greater')
+
+# What proportion of p-values are <= 0.05?
+sum(out$p.value <= 0.05) / n_out
+
+# Not bad. In fact, the p-values seem pretty uniform
+ggplot(out, aes(p.value)) + 
+  geom_histogram(aes(y = ..density..), bins = 100, color = 'black') + 
+  stat_function(dunif, color = 'red') + 
+  theme_bw()
+
+# QQ plot is probably more informative here
+chisq <- qchisq(p = 1 - dat$p.value, df = 1)
+lambda_val <- median(chisq) / qchisq(p = 0.5, df = 1)
+lambda_lbl <- paste('lambda ==',  round(lambda_val, 2))
+df <- data_frame(Observed = -log10(sort(dat$p.value)),
+                 Expected = -log10(ppoints(nrow(dat))))
+ggplot(df, aes(Expected, Observed)) + 
+  geom_point(size = 0.25) + 
+  geom_abline(intercept = 0, slope = 1, color = 'red') + 
+  labs(x = expression('Expected'~-log[10](italic(p))),
+       y = expression('Observed'~-log[10](italic(p)))) +
+  annotate('text', x = max(df$Expected), y = 0, size = 5,
+           hjust = 1, label = lambda_lbl, parse = TRUE) +
+  theme_bw()
   
-  
-  
-  
-  
-  
-  
+# I can live with that inflation factor, personally...
