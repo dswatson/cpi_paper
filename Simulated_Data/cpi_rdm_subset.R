@@ -65,7 +65,7 @@ p <- 5000
 out <- foreach(b = seq_len(100), .combine = rbind) %do% sim(b, n, p)
 saveRDS(out, 'cpi_rdm_subset.rds')
 
-# This looks pretty darn good to me
+# This looks good to me
 ggplot(out, aes(t)) + 
   geom_histogram(aes(y = ..density..), bins = 100, color = 'black') + 
   stat_function(fun = dt, color = 'red', args = list(df = 99)) + 
@@ -94,15 +94,15 @@ sum(out$p.value <= 0.05) / n_out
 # Not bad. In fact, the p-values seem pretty uniform
 ggplot(out, aes(p.value)) + 
   geom_histogram(aes(y = ..density..), bins = 100, color = 'black') + 
-  stat_function(dunif, color = 'red') + 
+  stat_function(fun = dunif, color = 'red') + 
   theme_bw()
 
 # QQ plot is probably more informative here
-chisq <- qchisq(p = 1 - dat$p.value, df = 1)
+chisq <- qchisq(p = 1 - out$p.value, df = 1)
 lambda_val <- median(chisq) / qchisq(p = 0.5, df = 1)
 lambda_lbl <- paste('lambda ==',  round(lambda_val, 2))
-df <- data_frame(Observed = -log10(sort(dat$p.value)),
-                 Expected = -log10(ppoints(nrow(dat))))
+df <- data_frame(Observed = -log10(sort(out$p.value)),
+                 Expected = -log10(ppoints(n_out)))
 ggplot(df, aes(Expected, Observed)) + 
   geom_point(size = 0.25) + 
   geom_abline(intercept = 0, slope = 1, color = 'red') + 
@@ -111,5 +111,3 @@ ggplot(df, aes(Expected, Observed)) +
   annotate('text', x = max(df$Expected), y = 0, size = 5,
            hjust = 1, label = lambda_lbl, parse = TRUE) +
   theme_bw()
-  
-# I can live with that inflation factor, personally...
