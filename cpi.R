@@ -251,7 +251,7 @@ rf_split <- function(x,
                      mtry = NULL, 
                      B = NULL, 
                      B0 = NULL, 
-                     n.sub = 100,
+                     n.sub = 500,
                      replace = TRUE,
                      n.cores = 1, 
                      seed = NULL) {
