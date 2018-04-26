@@ -2,34 +2,30 @@ library(ggplot2)
 library(tidyr)
 library(ranger)
 
-#source("cpi.R")
-source("cpi_noseed.R")
+source("cpi.R")
+#source("cpi_noseed.R")
 
 n <- 100
 p <- 1000
-num_cats <- rep(seq(2:11), each = p/10) # 2:11 unique values each
 num_replicates <- 30 #100
 
 num.trees <- 50
 mtry <- 10
 
 ## Data simulation
-simulate_data <- function(n, num_cats) {
-  x <- round(sapply(num_cats, runif, n = n, min = 1))
-  y <- runif(n)
+simulate_data <- function(n, p) {
+  x <- matrix(runif(n * p), ncol = p)
+  y <- rnorm(n)
   data.frame(y = y, x)
 }
 
 ## Run comparison
 res <- replicate(num_replicates, {
-  dat <- simulate_data(n, num_cats)
+  dat <- simulate_data(n, p)
   
-  # Standard impurity
-  #impurity <- ranger(y ~ ., dat, num.trees = num.trees, mtry = mtry, importance = "impurity")$variable.importance
-
   # Brute force
   #brute_force <- brute_force(y = dat[, 1], x = dat[, -1], B = num.trees, mtry = mtry, test = NULL)
-
+  
   # Sub-forest
   rf_split1 <- rf_split(y = dat[, 1], x = dat[, -1], B = num.trees, mtry = mtry, test = NULL, n.sub = 1)
   
@@ -38,29 +34,27 @@ res <- replicate(num_replicates, {
   
   # Repeated sub-forest 500
   rf_split500 <- rf_split(y = dat[, 1], x = dat[, -1], B = num.trees, mtry = mtry, test = NULL, n.sub = 500)
-
-  c(#impurity = impurity,
-    #brute_force = brute_force, 
+  
+  c(#brute_force = brute_force, 
     rf_split1 = rf_split1, 
     rf_split100 = rf_split100,
     rf_split500 = rf_split500)
 })
 
-df <- data.frame(t(res))
-df_long <- gather(df, value = "Importance")
+df <- data.frame(t(res), repl = factor(1:num_replicates))
+df_long <- gather(df, key = "repl", value = "Importance")
+colnames(df_long)[2] <- "key"
 df_long$Method <- factor(gsub("\\.X\\d+", "", df_long$key), 
-                         levels = c(#"impurity",
-                                    #"brute_force", 
-                                    "rf_split1", 
-                                    "rf_split100", 
-                                    "rf_split500"))
-df_long$Variable <- factor(gsub("^\\w+\\.", "", df_long$key), 
-                           levels = paste0("X", 1:p))
-levels(df_long$Variable) <- num_cats
+                         levels = c(#"brute_force", 
+                           "rf_split1", 
+                           "rf_split100", 
+                           "rf_split500"))
 
 ## Plot
-ggplot(df_long, aes(x = Variable, y = Importance)) + 
+ggplot(df_long, aes(x = repl, y = Importance)) + 
   geom_boxplot(outlier.size = .5) + 
   geom_hline(yintercept = 0, col = "red") + 
   facet_wrap(~ Method, scales = "free")
-#ggsave("split_bias.pdf")
+
+## Values are actually the same for all except the first replication ...
+df_long[df_long$key == "rf_split1.X1", "Importance"]

@@ -25,7 +25,7 @@ brute_force <- function(x,
   }
   if (is.null(mtry)) {
     if (type == 'regression') {
-      mtry <- floor(p / 3)
+      mtry <- floor(p/3)
     } else {
       mtry <- floor(sqrt(p))
     }
@@ -50,7 +50,7 @@ brute_force <- function(x,
       # Grow full forest
       rf <- ranger(data = df, dependent.variable.name = 'y', 
                    mtry = mtry, num.trees = B, replace = replace,
-                   keep.inbag = TRUE, num.threads = n.cores, seed = seed)
+                   keep.inbag = TRUE, num.threads = n.cores)
       # Calculate precision
       wts <- 1 / predict(rf, data = df, num.threads = n.cores,
                          type = 'se')$se^2
@@ -58,7 +58,7 @@ brute_force <- function(x,
       # Grow full forest
       rf <- ranger(data = df, dependent.variable.name = 'y', 
                    mtry = mtry, num.trees = B, replace = replace,
-                   num.threads = n.cores, seed = seed)
+                   num.threads = n.cores)
     }
     # Calculate sample-wise loss
     loss <- (rf$predictions - y)^2
@@ -68,7 +68,7 @@ brute_force <- function(x,
         # Grow full forest
         rf <- ranger(data = df, dependent.variable.name = 'y', 
                      mtry = mtry, num.trees = B, replace = replace,
-                     keep.inbag = TRUE, num.threads = n.cores, seed = seed,
+                     keep.inbag = TRUE, num.threads = n.cores,
                      probability = TRUE)
         # Calculate sample-wise precision
         wts <- 1 / predict(rf, data = df, num.threads = n.cores,
@@ -77,7 +77,7 @@ brute_force <- function(x,
         # Grow full forest
         rf <- ranger(data = df, dependent.variable.name = 'y', 
                      mtry = mtry, num.trees = B, replace = replace,
-                     num.threads = n.cores, seed = seed,
+                     num.threads = n.cores,
                      probability = TRUE)
       }
       # Extract probabilities
@@ -86,7 +86,7 @@ brute_force <- function(x,
       # Grow full forest
       rf <- ranger(data = df, dependent.variable.name = 'y', 
                    mtry = mtry, num.trees = B, replace = replace,
-                   keep.inbag = TRUE, num.threads = n.cores, seed = seed,
+                   keep.inbag = TRUE, num.threads = n.cores,
                    classification = TRUE)
       # Extract probabilities
       oob_idx <- ifelse(simplify2array(rf$inbag.counts) == 0, TRUE, NA)
@@ -108,7 +108,7 @@ brute_force <- function(x,
         # Grow forest
         rf0 <- ranger(data = df0, dependent.variable.name = 'y', 
                       mtry = mtry, num.trees = B, replace = replace,
-                      keep.inbag = TRUE, num.threads = 1, seed = seed)
+                      keep.inbag = TRUE, num.threads = 1)
         # Calculate weights
         wts0 <- 1 / predict(rf0, data = df0, num.threads = 1,
                             type = 'se')$se^2
@@ -116,7 +116,7 @@ brute_force <- function(x,
         # Grow forest
         rf0 <- ranger(data = df0, dependent.variable.name = 'y', 
                       mtry = mtry, num.trees = B, replace = replace,
-                      num.threads = 1, seed = seed)
+                      num.threads = 1)
       }
       # Calculate sample-wise loss
       loss0 <- (rf0$predictions - y)^2
@@ -126,7 +126,7 @@ brute_force <- function(x,
           # Grow forest
           rf0 <- ranger(data = df0, dependent.variable.name = 'y', 
                         mtry = mtry, num.trees = B, replace = replace,
-                        keep.inbag = TRUE, num.threads = 1, seed = seed, 
+                        keep.inbag = TRUE, num.threads = 1, 
                         probability = TRUE) 
           # Calculate weights
           wts0 <- 1 / (predict(rf0, data = df0, num.threads = 1,
@@ -135,7 +135,7 @@ brute_force <- function(x,
           # Grow forest
           rf0 <- ranger(data = df0, dependent.variable.name = 'y', 
                         mtry = mtry, num.trees = B, replace = replace,
-                        num.threads = 1, seed = seed, 
+                        num.threads = 1, 
                         probability = TRUE) 
         }
         # Extract probabilities
@@ -144,7 +144,7 @@ brute_force <- function(x,
         # Grow forest
         rf0 <- ranger(data = df0, dependent.variable.name = 'y',
                       mtry = mtry, num.trees = B, replace = replace,
-                      keep.inbag = TRUE, num.threads = 1, seed = seed,
+                      keep.inbag = TRUE, num.threads = 1,
                       classification = TRUE)
         # Extract probabilities
         oob_idx <- ifelse(simplify2array(rf0$inbag.counts) == 0, TRUE, NA)
@@ -300,26 +300,26 @@ rf_split <- function(x,
     # Grow forest
     rf <- ranger(data = df, dependent.variable.name = 'y', 
                  mtry = mtry, num.trees = B, replace = replace,
-                 keep.inbag = TRUE, num.threads = n.cores, seed = seed)
-    # Create n x B prediction matrix
+                 keep.inbag = TRUE, num.threads = n.cores)
+    # Create n x B matrix of predictions
     preds <- predict(rf, data = df, num.threads = n.cores,
                      predict.all = TRUE)$predictions 
   } else if (type == 'probability') {
     # Grow forest
     rf <- ranger(data = df, dependent.variable.name = 'y', 
                  mtry = mtry, num.trees = B, replace = replace,
-                 keep.inbag = TRUE, num.threads = n.cores, seed = seed,
+                 keep.inbag = TRUE, num.threads = n.cores,
                  probability = TRUE)
-    # Create n x B prediction matrix
+    # Create n x B matrix of predictions
     preds <- predict(rf, data = df, num.threads = n.cores,
                      predict.all = TRUE)$predictions[, 1, ]
   } else if (type == 'classification') {
     # Grow forest
     rf <- ranger(data = df, dependent.variable.name = 'y', 
                  mtry = mtry, num.trees = B, replace = replace,
-                 keep.inbag = TRUE, num.threads = n.cores, seed = seed,
+                 keep.inbag = TRUE, num.threads = n.cores,
                  classification = TRUE)
-    # Create n x B prediction matrix
+    # Create n x B matrix of predictions
     preds <- predict(rf, df, num.threads = n.cores,
                      predict.all = TRUE)$predictions - 1
   }
@@ -344,7 +344,7 @@ rf_split <- function(x,
   
   # Calculate loss from random sub-forests
   sub_forest <- function(b) {
-    set.seed(b)
+    #set.seed(b)
     sub_idx <- sample.int(B, exp_B0)
     y_hat <- rowMeans2(oob_preds[, sub_idx, drop = FALSE], na.rm = TRUE)
     if (type == 'regression') {
@@ -372,6 +372,7 @@ rf_split <- function(x,
       subs <- rowMeans2(foreach(b = seq_len(n.sub), .combine = cbind) %do% sub_forest(b))
     }
   }
+
   loss <- subs[seq_len(n)]
   if (weights) {
     wts <- subs[(n + 1):(2 * n)]
@@ -383,7 +384,7 @@ rf_split <- function(x,
     y_hat0 <- rowMeans2(oob_preds[, f0_idx, drop = FALSE], na.rm = TRUE)
     if (type == 'regression') {
       loss0 <- (y_hat0 - y)^2
-    } else if (type %in% c('probability', 'classification')) {
+    } else {
       loss0 <- -(y * log(y_hat0) + (1 - y) * log(1 - y_hat0))
     }
     if (weights) {
@@ -482,6 +483,6 @@ rf_split <- function(x,
 
 
 # Problems, ideas:
-# Revise for multi-class problems (k > 2)
+# Not sure how to extend this to multi-class problems (k > 2)?
 # Extend to survival forests?
-# Need to fix cross entropy formula for factor inputs
+# Need to revise cross entropy formula for factor inputs
