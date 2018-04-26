@@ -5,7 +5,7 @@ library(ranger)
 library(matrixStats)
 library(tidyverse)
 library(doMC)
-registerDoMC(4)
+registerDoMC(20)
 
 # Simulation function
 sim <- function(b, n, p) {
@@ -22,11 +22,11 @@ sim <- function(b, n, p) {
   df <- data.frame(x, y = y)
   rf <- ranger(data = df, dependent.variable.name = 'y', 
                mtry = mtry, num.trees = B, replace = FALSE,
-               keep.inbag = TRUE, num.threads = 4, seed = b)
+               keep.inbag = TRUE, num.threads = 20, seed = b)
   
   # Create oob_preds object
   oob_idx <- ifelse(simplify2array(rf$inbag.counts) == 0, TRUE, NA)
-  preds <- predict(rf, df, num.threads = 4, predict.all = TRUE)$predictions
+  preds <- predict(rf, df, num.threads = 20, predict.all = TRUE)$predictions
   oob_preds <- oob_idx * preds
   
   # Extract predictions, loss
@@ -34,9 +34,8 @@ sim <- function(b, n, p) {
   emp_risk <- mean((y_hat - y)^2)
   
   # Proportion of trees expected in sub-forest?
-  splits <- sapply(seq_len(B), function(b) {
+  splits <- foreach(b = seq_len(B), .combine = c) %dopar% 
     sum(!treeInfo(rf, b)$terminal)
-  })
   pr_null <- (1 - mtry/p)^mean(splits)
   
   # Random sub-forests
@@ -67,13 +66,14 @@ sim <- function(b, n, p) {
   
 }
 
-# Run 10 iterations
+# Run 100 iterations
 n <- 100
 p <- 5000
-out <- foreach(b = seq_len(10), .combine = rbind) %do% sim(b, n, p)
+out <- foreach(b = seq_len(100), .combine = rbind) %do% sim(b, n, p)
+saveRDS(out, 'fsubset.rds')
 
 # Test each run separately
-(pvals <- sapply(seq_len(10), function(b) {
+(pvals <- sapply(seq_len(100), function(b) {
   with(filter(out, Run == b), 
        t.test(Drop, Random, alternative = 'greater')$p.value)
 }))

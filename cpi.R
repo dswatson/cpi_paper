@@ -25,7 +25,7 @@ brute_force <- function(x,
   }
   if (is.null(mtry)) {
     if (type == 'regression') {
-      mtry <- floor(p/3)
+      mtry <- floor(p / 3)
     } else {
       mtry <- floor(sqrt(p))
     }
@@ -301,7 +301,7 @@ rf_split <- function(x,
     rf <- ranger(data = df, dependent.variable.name = 'y', 
                  mtry = mtry, num.trees = B, replace = replace,
                  keep.inbag = TRUE, num.threads = n.cores, seed = seed)
-    # Create n x B matrix of predictions
+    # Create n x B prediction matrix
     preds <- predict(rf, data = df, num.threads = n.cores,
                      predict.all = TRUE)$predictions 
   } else if (type == 'probability') {
@@ -310,7 +310,7 @@ rf_split <- function(x,
                  mtry = mtry, num.trees = B, replace = replace,
                  keep.inbag = TRUE, num.threads = n.cores, seed = seed,
                  probability = TRUE)
-    # Create n x B matrix of predictions
+    # Create n x B prediction matrix
     preds <- predict(rf, data = df, num.threads = n.cores,
                      predict.all = TRUE)$predictions[, 1, ]
   } else if (type == 'classification') {
@@ -319,7 +319,7 @@ rf_split <- function(x,
                  mtry = mtry, num.trees = B, replace = replace,
                  keep.inbag = TRUE, num.threads = n.cores, seed = seed,
                  classification = TRUE)
-    # Create n x B matrix of predictions
+    # Create n x B prediction matrix
     preds <- predict(rf, df, num.threads = n.cores,
                      predict.all = TRUE)$predictions - 1
   }
@@ -379,7 +379,7 @@ rf_split <- function(x,
     y_hat0 <- rowMeans2(oob_preds[, f0_idx, drop = FALSE], na.rm = TRUE)
     if (type == 'regression') {
       loss0 <- (y_hat0 - y)^2
-    } else {
+    } else if (type %in% c('probability', 'classification')) {
       loss0 <- -(y * log(y_hat0) + (1 - y) * log(1 - y_hat0))
     }
     if (weights) {
@@ -478,6 +478,6 @@ rf_split <- function(x,
 
 
 # Problems, ideas:
-# Not sure how to extend this to multi-class problems (k > 2)?
+# Revise for multi-class problems (k > 2)
 # Extend to survival forests?
-# Need to revise cross entropy formula for factor inputs
+# Need to fix cross entropy formula for factor inputs
