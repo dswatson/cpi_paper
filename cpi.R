@@ -362,11 +362,15 @@ rf_split <- function(x,
     return(c(loss, wts))
   }
   
-  # Optionally execute in parallel
-  if (n.cores > 1) {
-    subs <- rowMeans2(foreach(b = seq_len(n.sub), .combine = cbind) %dopar% sub_forest(b))
+  if (n.sub == 1) {
+    subs <- sub_forest(1)
   } else {
-    subs <- rowMeans2(foreach(b = seq_len(n.sub), .combine = cbind) %do% sub_forest(b))
+    # Optionally execute in parallel
+    if (n.cores > 1) {
+      subs <- rowMeans2(foreach(b = seq_len(n.sub), .combine = cbind) %dopar% sub_forest(b))
+    } else {
+      subs <- rowMeans2(foreach(b = seq_len(n.sub), .combine = cbind) %do% sub_forest(b))
+    }
   }
   loss <- subs[seq_len(n)]
   if (weights) {
