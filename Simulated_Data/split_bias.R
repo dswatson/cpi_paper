@@ -7,7 +7,7 @@ source("cpi_noseed.R")
 
 n <- 100
 p <- 1000
-num_cats <- rep(seq(2:11), each = p/10) # 2:11 unique values each
+num_cats <- rep(seq(2, 11), each = p/10) # 2:11 unique values each
 num_replicates <- 30 #100
 
 num.trees <- 50
