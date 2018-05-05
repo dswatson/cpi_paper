@@ -1,6 +1,6 @@
 ### Likelihood ratio tests for CPI? ###
 
-cpi_lrt <- function(dat, f, f0, df, type = 'regression') {
+cpi_lrt <- function(x, y, f, f0, df, type = 'regression') {
   
   if (type == 'regression') {
     # Alternative
