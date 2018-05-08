@@ -20,26 +20,26 @@ res <- replicate(num_replicates, {
   dat <- simulate_data(n, num_cats)
   task <- makeRegrTask(data = dat, target = "y")
   
-  bf_lm <- brute_force_mlr(task = task, learner = makeLearner("regr.lm"), measures = list(mse))
-  bf_rpart <- brute_force_mlr(task = task, learner = makeLearner("regr.rpart"), measures = list(mse))
-  bf_nnet <- brute_force_mlr(task = task, learner = makeLearner("regr.nnet", size = 5, decay = 0.1, trace = FALSE), measures = list(mse))
-  bf_svm <- brute_force_mlr(task = task, learner = makeLearner("regr.svm"), measures = list(mse))
+  bf_lm <- brute_force_mlr(task = task, learner = makeLearner("regr.lm"))
+  bf_rpart <- brute_force_mlr(task = task, learner = makeLearner("regr.rpart"))
+  bf_nnet <- brute_force_mlr(task = task, learner = makeLearner("regr.nnet", size = 5, decay = 0.1, trace = FALSE))
+  bf_svm <- brute_force_mlr(task = task, learner = makeLearner("regr.svm"))
   
-  c(lm = bf_lm, 
-    rpart = bf_rpart, 
-    nnet = bf_nnet, 
-    svm = bf_svm)
+  c(lm = bf_lm$CPI, 
+    rpart = bf_rpart$CPI, 
+    nnet = bf_nnet$CPI, 
+    svm = bf_svm$CPI)
 })
 
 df <- data.frame(t(res))
 df_long <- gather(df, value = "Importance")
-df_long$Method <- factor(gsub("\\.X\\d+", "", df_long$key), 
+df_long$Method <- factor(gsub("\\d+", "", df_long$key), 
                          levels = c("lm",
                                     "rpart", 
                                     "nnet",
                                     "svm"))
-df_long$Variable <- factor(gsub("^\\w+\\.", "", df_long$key), 
-                           levels = paste0("X", 1:p))
+df_long$Variable <- factor(gsub("^[a-z]+", "", df_long$key), 
+                           levels = 1:p)
 levels(df_long$Variable) <- num_cats
 
 ## Plot
@@ -47,4 +47,4 @@ ggplot(df_long, aes(x = Variable, y = Importance)) +
   geom_boxplot(outlier.size = .5) + 
   geom_hline(yintercept = 0, col = "red") + 
   facet_wrap(~ Method, scales = "free")
-ggsave("split_bias_mlr.pdf")
+#ggsave("split_bias_mlr.pdf")

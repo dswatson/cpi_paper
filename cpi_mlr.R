@@ -3,31 +3,29 @@ library(mlr)
 library(foreach)
 
 # TODO: Add confidence intervals
-# TODO: Don't offer choice of measure but always use MSE? Classification?
+# TODO: How to compute loss for classification?
 brute_force_mlr <- function(task, learner, 
                             resampling = makeResampleDesc("CV", iters = 5), 
-                            measures = NULL, 
                             test = NULL,
                             verbose = FALSE, 
                             cores = 1) {
+  
   # Full model resampling
-  full_model <- resample(learner, task, resampling = resampling, measures = measures, show.info = verbose)
-  if (!is.null(test)) {
-    err_full <- (full_model$pred$data$truth - full_model$pred$data$response)^2
-  }
+  full_model <- resample(learner, task, resampling = resampling, show.info = verbose)
+  err_full <- compute_loss(full_model)
   
   # For each feature, fit reduced model and return difference in error
   cpi_fun <- function(i) {
     reduced_task <- subsetTask(task, features = getTaskFeatureNames(task)[-i])
-    reduced_model <- resample(learner, reduced_task, resampling = resampling, measures = measures, show.info = verbose)
+    reduced_model <- resample(learner, reduced_task, resampling = resampling, show.info = verbose)
+    err_reduced <- compute_loss(reduced_model)
     
     res <- data.frame(Variable = getTaskFeatureNames(task)[i],
-                      CPI = unname(reduced_model$aggr - full_model$aggr), 
+                      CPI = mean(err_reduced - err_full), 
                       stringsAsFactors = FALSE)
 
     # Statistical testing
     if (!is.null(test)) {
-      err_reduced <- (reduced_model$pred$data$truth - reduced_model$pred$data$response)^2
       if (test == "t") {
         test_result <- t.test(err_reduced, err_full, paired = TRUE, alternative = 'greater')
       } else if (test == "wilcox") {
@@ -49,3 +47,21 @@ brute_force_mlr <- function(task, learner,
   }
 }
 
+compute_loss <- function(model) {
+  if (getTaskType(model) == "regr") {
+    # MSE
+    loss <- (model$pred$data$truth - model$pred$data$response)^2
+  } else if (getTaskType(task) == "classif") {
+    if (hasLearnerProperties(model$learner, "prob")) {
+      # 0/1 loss
+      y <- model$pred$data$truth
+      y_hat <- model$pred$data$response
+      loss <- -(y * log(y_hat) + (1 - y) * log(1 - y_hat))
+    } else {
+      stop("For classification the learner requires probability support.")
+    }
+  } else {
+    stop("Unknown task type.")
+  }
+  loss
+}
