@@ -21,3 +21,12 @@ brute_force_mlr(task = iris.task, learner = makeLearner("classif.glmnet", predic
 brute_force_mlr(task = iris.task, learner = makeLearner("classif.glmnet", predict.type = "prob"), test = "t")
 brute_force_mlr(task = iris.task, learner = makeLearner("classif.glmnet", predict.type = "prob"), test = "lrt")
 
+# OOB error
+brute_force_mlr(task = bh.task, learner = makeLearner("regr.ranger", num.trees = 50), resampling = "oob")
+brute_force_mlr(task = bh.task, learner = makeLearner("regr.ranger", num.trees = 50), resampling = "oob", test = "t")
+brute_force_mlr(task = bh.task, learner = makeLearner("regr.ranger", num.trees = 50), resampling = "oob", test = "lrt")
+
+# Training error
+brute_force_mlr(task = bh.task, learner = makeLearner("regr.lm"), resampling = "none")
+brute_force_mlr(task = bh.task, learner = makeLearner("regr.lm"), resampling = "none", test = "t")
+brute_force_mlr(task = bh.task, learner = makeLearner("regr.lm"), resampling = "none", test = "lrt")
