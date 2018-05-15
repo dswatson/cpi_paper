@@ -45,7 +45,7 @@ brute_force_mlr <- function(task, learner,
     aggr_reduced <- performance(pred_reduced, measure)
     
     res <- data.frame(Variable = getTaskFeatureNames(task)[i],
-                      CPI = unname(aggr_full - aggr_reduced), 
+                      CPI = unname(aggr_reduced - aggr_full), 
                       stringsAsFactors = FALSE)
 
     # Statistical testing
