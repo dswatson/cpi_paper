@@ -99,7 +99,7 @@ brute_force <- function(x,
                       num.threads = 1, seed = seed, 
                       probability = TRUE) 
         # Extract probabilities
-        y_hat0 <- f0$predictions[, 1]
+        y_hat0 <- rf0$predictions[, 1]
       } else if (type == 'classification') {
         # Grow forest
         rf0 <- ranger(data = df0, dependent.variable.name = 'y',
