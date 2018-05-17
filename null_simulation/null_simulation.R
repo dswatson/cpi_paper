@@ -4,7 +4,7 @@ library(batchtools)
 library(ggplot2)
 
 # Simulation parameters ----------------------------------------------------------------
-num_replicates <- 30
+num_replicates <- 1000
 n <- 100
 p <- 10
 
@@ -52,7 +52,7 @@ addExperiments(prob_design, algo_design, repls = num_replicates)
 summarizeExperiments()
 
 # Submit -----------------------------------------------------------
-if (grepl("node\\d{2}|bipscluster", system("hostname", intern = TRUE))) {
+if (grepl("bipscluster", system("hostname", intern = TRUE))) {
   ids <- findNotStarted()
   ids[, chunk := chunk(job.id, chunk.size = 400)]
   submitJobs(ids = ids, # walltime in seconds, 10 days max, memory in MB
@@ -78,6 +78,7 @@ ggplot(res, aes(x = Variable, y = CPI)) +
   facet_wrap(~ learner_name) + 
   geom_hline(yintercept = 0, col = "red") + 
   xlab("Variable") + ylab("CPI value")
+ggsave("cv_CPI.pdf")
 
 # Type 1 error (mean over replications)
 res[, reject := p.value <= 0.05]
@@ -87,18 +88,20 @@ ggplot(res_mean, aes(x = test, y = power)) +
   facet_wrap(~ learner_name) + 
   geom_hline(yintercept = 0.05, col = "red") + 
   xlab("Test") + ylab("Type I error")
+ggsave("cv_typeI.pdf")
 
 # Histograms of t-test statistics (over all variables)
 ggplot(res[test == "t", ], aes(Statistic)) + 
   geom_histogram(aes(y = ..density..), bins = 100) + 
   facet_wrap(~ learner_name) + 
-  #stat_function(fun = dt, color = 'red', args = list(df = unique(n) - 1)) + 
+  stat_function(fun = dt, color = 'red', args = list(df = unique(n) - 1)) + 
   xlab("Test statistic") + ylab("Density")
+ggsave("cv_t.pdf")
 
 # Histograms of LRT statistics (over all variables)
 ggplot(res[test == "lrt", ], aes(Statistic)) + 
   geom_histogram(aes(y = ..density..), bins = 100) + 
   facet_wrap(~ learner_name) + 
-  #stat_function(fun = dchisq, color = 'red', args = list(df = 1)) + 
+  stat_function(fun = dchisq, color = 'red', args = list(df = 1)) + 
   xlab("Test statistic") + ylab("Density")
-
+ggsave("cv_lrt.pdf")
