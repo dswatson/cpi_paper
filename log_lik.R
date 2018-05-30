@@ -5,7 +5,7 @@ log_lik <- function(x, y, rf) {
   if (rf$treetype == 'Regression') {
     y_hat <- rf$predictions
     rmse <- sqrt(rf$prediction.error)
-    ll <- sum(log(dnorm(y, mean = y_hat, sd = rmse)))
+    ll <- sum(dnorm(y, mean = y_hat, sd = rmse, log = TRUE))
   } else if (rf$treetype == 'Classification') {
     oob_idx <- ifelse(simplify2array(rf$inbag.counts) == 0, TRUE, NA)
     preds <- predict(rf, x, predict.all = TRUE)$predictions - 1

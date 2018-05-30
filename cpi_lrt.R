@@ -36,7 +36,7 @@ cpi_lrt <- function(x,
     # Calculate log likelihood
     y_hat <- rf$predictions
     rmse <- sqrt(rf$prediction.error)
-    ll <- sum(log(dnorm(y, mean = y_hat, sd = rmse)))
+    ll <- sum(dnorm(y, mean = y_hat, sd = rmse, log = TRUE))
   } else if (type == 'classification') {
     # Grow full forest
     rf <- ranger(data = df, dependent.variable.name = 'y', 
@@ -65,7 +65,7 @@ cpi_lrt <- function(x,
       # Calculate log likelihood
       y_hat0 <- rf0$predictions
       rmse0 <- sqrt(rf0$prediction.error)
-      ll0 <- sum(log(dnorm(y, mean = y_hat0, sd = rmse0)))
+      ll0 <- sum(dnorm(y, mean = y_hat0, sd = rmse0, log = TRUE))
     } else if (type == 'classification') {
       # Grow forest
       rf0 <- ranger(data = df0, dependent.variable.name = 'y',
