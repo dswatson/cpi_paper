@@ -44,7 +44,7 @@ brute_force <- function(x,
     if (test == 'lrt') {
       # Calculate log likelihood
       rmse <- sqrt(rf$prediction.error)
-      ll <- sum(log(dnorm(y, mean = rf$predictions, sd = rmse)))
+      ll <- sum(dnorm(y, mean = rf$predictions, sd = rmse, log = TRUE))
     }
   } else {
     if (type == 'probability') {
@@ -89,7 +89,7 @@ brute_force <- function(x,
       if (test == 'lrt') {
         # Calculate log likelihood
         rmse0 <- sqrt(rf0$prediction.error)
-        ll0 <- sum(log(dnorm(y, mean = rf0$predictions, sd = rmse0)))
+        ll0 <- sum(dnorm(y, mean = rf0$predictions, sd = rmse0, log = TRUE))
       }
     } else {
       if (type == 'probability') {
@@ -300,7 +300,7 @@ rf_split <- function(x,
       loss <- (y_hat - y)^2
       if (test == 'lrt') {
         rmse <- sqrt(mean(loss))
-        ll <- sum(log(dnorm(y, mean = y_hat, sd = rmse)))
+        ll <- sum(dnorm(y, mean = y_hat, sd = rmse, log = TRUE))
       }
     } else if (type %in% c('probability', 'classification')) {
       loss <- -(y * log(y_hat) + (1 - y) * log(1 - y_hat))
@@ -338,7 +338,7 @@ rf_split <- function(x,
       loss0 <- (y_hat0 - y)^2
       if (test == 'lrt') {
         rmse0 <- sqrt(mean(loss0))
-        ll0 <- sum(log(dnorm(y, mean = y_hat0, sd = rmse0)))
+        ll0 <- sum(dnorm(y, mean = y_hat0, sd = rmse0, log = TRUE))
       }
     } else if (type %in% c('probability', 'classification')) {
       loss0 <- -(y * log(y_hat0) + (1 - y) * log(1 - y_hat0))
