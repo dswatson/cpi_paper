@@ -49,7 +49,7 @@ cpi_lrt <- function(x,
                      predict.all = TRUE)$predictions - 1
     y_hat <- rowMeans2(oob_idx * preds, na.rm = TRUE)
     # Calculate log likelihood
-    ll <- sum(y * log(y_hat) + (1 - y) * log(1 - y_hat))
+    ll <- -sum(y * log(y_hat) + (1 - y) * log(1 - y_hat))
   }
   
   ### Part II: Null forests ###
