@@ -18,8 +18,8 @@ loop <- function(b, k, n, p) {
   # Create folds
   flds <- split(sample.int(n), rep(seq_len(k), length.out = n))
   # Define cv function
-  cv <- function(k) {
-    idx <- flds[[k]]
+  cv <- function(m) {
+    idx <- flds[[m]]
     test <- df[idx, ]
     train <- df[-idx, ]
     f <- lm(y ~ ., data = train)
@@ -40,7 +40,7 @@ loop <- function(b, k, n, p) {
     return(out)
   }
   # Compute over folds
-  out <- foreach(k = seq_len(k), .combine = rbind) %do% cv(k) 
+  out <- foreach(m = seq_len(k), .combine = rbind) %do% cv(m) 
   as_tibble(out) %>%
     mutate(Run = b) %>%
     return(.)
@@ -54,10 +54,10 @@ out <- foreach(b = seq_len(1e4), .combine = rbind) %dopar%
 t_test <- function(b, j) {
   tmp <- out %>% filter(Run == b)
   delta <- tmp[[j]] - tmp$full
-  mu <- mean(delta)
-  sigma <- sd(delta) / sqrt(100)
+  cpi <- mean(delta)
+  sigma <- sd(delta) / sqrt(n)
   t_test <- t.test(delta, alternative = 'greater')
-  out <- c(mu, sigma, t_test$statistic, t_test$p.value)
+  out <- c(cpi, sigma, t_test$statistic, t_test$p.value)
   return(out)
 }
 
