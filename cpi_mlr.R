@@ -31,8 +31,11 @@ brute_force_mlr <- function(task, learner,
     }
   }
   
+  # Create resampling instance
+  resample_instance <- makeResampleInstance(desc = resampling, task = task)
+  
   # Fit learner and compute performance
-  pred_full <- fit_learner(learner = learner, task = task, resampling = resampling, measure = measure, verbose = verbose)
+  pred_full <- fit_learner(learner = learner, task = task, resampling = resample_instance, measure = measure, verbose = verbose)
   aggr_full <- performance(pred_full, measure)
   if (!is.null(test)) {
     err_full <- compute_loss(pred_full)
@@ -41,7 +44,7 @@ brute_force_mlr <- function(task, learner,
   # For each feature, fit reduced model and return difference in error
   cpi_fun <- function(i) {
     reduced_task <- subsetTask(task, features = getTaskFeatureNames(task)[-i])
-    pred_reduced <- fit_learner(learner = learner, task = reduced_task, resampling = resampling, measure = measure, verbose = verbose)
+    pred_reduced <- fit_learner(learner = learner, task = reduced_task, resampling = resample_instance, measure = measure, verbose = verbose)
     aggr_reduced <- performance(pred_reduced, measure)
     
     res <- data.frame(Variable = getTaskFeatureNames(task)[i],
