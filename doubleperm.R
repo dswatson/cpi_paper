@@ -10,8 +10,12 @@ loop <- function(n, b) {
   # Simulate data
   dat <- mlbench.friedman1(3 * n)
   dat <- dat01 <- dat02 <- data.frame(dat$x, y = dat$y)
+  
+  # Independent permutations
   dat01[, 10] <- dat[sample.int(3 * n), 10]
   dat02[, 10] <- dat[sample.int(3 * n), 10]
+  
+  # Split into training and test sets
   train <- dat[seq_len(2 * n), ]
   train01 <- dat01[seq_len(2 * n), ]
   train02 <- dat02[seq_len(2 * n), ]
@@ -32,7 +36,7 @@ loop <- function(n, b) {
   loss01 <- (test01$y - y_hat01)^2
   loss02 <- (test02$y - y_hat02)^2
   
-  # Delta vectors
+  # Define and test delta vectors
   delta1 <- loss01 - loss
   delta0 <- loss02 - loss01
   delta <- delta1 - delta0
