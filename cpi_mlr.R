@@ -7,6 +7,7 @@ brute_force_mlr <- function(task, learner,
                             resampling = makeResampleDesc("CV", iters = 5), 
                             measure = NULL,
                             test = NULL,
+                            permute = FALSE,
                             verbose = FALSE, 
                             cores = 1) {
   if (is.null(measure)) {
@@ -32,7 +33,11 @@ brute_force_mlr <- function(task, learner,
   }
   
   # Create resampling instance
-  resample_instance <- makeResampleInstance(desc = resampling, task = task)
+  if (resampling %in% c("oob", "none")) {
+    resample_instance <- resampling
+  } else {
+    resample_instance <- makeResampleInstance(desc = resampling, task = task)
+  }
   
   # Fit learner and compute performance
   pred_full <- fit_learner(learner = learner, task = task, resampling = resample_instance, measure = measure, verbose = verbose)
@@ -43,7 +48,14 @@ brute_force_mlr <- function(task, learner,
   
   # For each feature, fit reduced model and return difference in error
   cpi_fun <- function(i) {
-    reduced_task <- subsetTask(task, features = getTaskFeatureNames(task)[-i])
+    if (permute) {
+      reduced_data <- getTaskData(task)
+      reduced_data[, getTaskFeatureNames(task)[i]] <- sample(reduced_data[, getTaskFeatureNames(task)[i]])
+      reduced_task <- changeData(task, reduced_data)
+    } else {
+      reduced_task <- subsetTask(task, features = getTaskFeatureNames(task)[-i])
+    }
+    
     pred_reduced <- fit_learner(learner = learner, task = reduced_task, resampling = resample_instance, measure = measure, verbose = verbose)
     aggr_reduced <- performance(pred_reduced, measure)
     
@@ -56,6 +68,10 @@ brute_force_mlr <- function(task, learner,
       err_reduced <- compute_loss(pred_reduced)
       if (test == "t") {
         test_result <- t.test(err_reduced, err_full, paired = TRUE, alternative = 'greater')
+        res$statistic <- test_result$statistic
+        res$p.value <- test_result$p.value
+      } else if (test == "U") {
+        test_result <- wilcox.test(err_reduced, err_full, paired = TRUE, alternative = 'greater', exact = FALSE)
         res$statistic <- test_result$statistic
         res$p.value <- test_result$p.value
       } else if (test == "lrt") {
