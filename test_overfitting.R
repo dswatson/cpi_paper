@@ -5,7 +5,7 @@ source("cpi_mlr.R")
 
 n <- 100
 p <- 10
-num_replicates <- 100
+num_replicates <- 1000
 
 sim_data <- function(n, p, ...) {
   x <- matrix(runif(n * p), ncol = p,
@@ -24,7 +24,11 @@ cpi_fun <- function(task, learner, resampling, measure, p_reduce) {
   aggr_full <- performance(pred_full, measure)
   
   # Fit reduced learner and compute performance
-  reduced_task <- subsetTask(task, features = getTaskFeatureNames(task)[-(1:p_reduce)])
+  if (p_reduce == 0) {
+    reduced_task <- task
+  } else {
+    reduced_task <- subsetTask(task, features = getTaskFeatureNames(task)[-(1:p_reduce)])
+  }
   pred_reduced <- fit_learner(learner = learner, task = reduced_task, resampling = resample_instance, measure = measure, verbose = FALSE)
   aggr_reduced <- performance(pred_reduced, measure)
   
@@ -41,7 +45,7 @@ compare_fun <- function(n, p) {
 res <- replicate(num_replicates, compare_fun(n, p))
 res_long <- melt(res)
 colnames(res_long) <- c("Vars_dropped", "repl", "CPI")
-ggplot(res_long, aes(x = factor(Vars_dropped), y = CPI)) + 
+ggplot(res_long, aes(x = factor(Vars_dropped-1), y = CPI)) + 
   geom_boxplot() + 
   geom_hline(yintercept = 0, col = "red") + 
   xlab("Number of dropped variables") + ylab("CPI value")

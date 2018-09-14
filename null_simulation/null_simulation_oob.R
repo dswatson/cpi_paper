@@ -4,13 +4,13 @@ library(batchtools)
 library(ggplot2)
 
 # Simulation parameters ----------------------------------------------------------------
-num_replicates <- 1000
-n <- 100
+num_replicates <- 10000
+n <- 1000
 p <- 10
 
 # Algorithm parameters ----------------------------------------------------------------
-learners <- c("regr.ranger") #c("regr.lm", "regr.ranger", "regr.nnet", "regr.svm")
-tests <- c("t", "lrt")
+learners <- c("regr.lm", "regr.ranger", "regr.nnet", "regr.svm")
+tests <- "t" #c("t", "lrt")
 
 # Registry ----------------------------------------------------------------
 reg_name <- "cpi_null_oob"
@@ -76,7 +76,7 @@ saveRDS(res, "null_simulation_oob.Rds")
 # Boxplots of CPI values per variable
 ggplot(res, aes(x = Variable, y = CPI)) + 
   geom_boxplot() + 
-  facet_wrap(~ learner_name) + 
+  facet_wrap(~ learner_name, scales = "free") + 
   geom_hline(yintercept = 0, col = "red") + 
   xlab("Variable") + ylab("CPI value")
 ggsave("oob_CPI.pdf")
@@ -99,11 +99,19 @@ ggplot(res[test == "t", ], aes(Statistic)) +
   xlab("Test statistic") + ylab("Density")
 ggsave("oob_t.pdf")
 
-# Histograms of LRT statistics (over all variables)
-ggplot(res[test == "lrt", ], aes(Statistic)) + 
+# # Histograms of LRT statistics (over all variables)
+# ggplot(res[test == "lrt", ], aes(Statistic)) +
+#   geom_histogram(aes(y = ..density..), bins = 100) +
+#   facet_wrap(~ learner_name) +
+#   stat_function(fun = dchisq, color = 'red', args = list(df = 1)) +
+#   xlab("Test statistic") + ylab("Density")
+# ggsave("oob_lrt.pdf")
+
+# Histograms of CPI values (over all variables)
+ggplot(res, aes(CPI)) + 
   geom_histogram(aes(y = ..density..), bins = 100) + 
-  facet_wrap(~ learner_name) + 
-  stat_function(fun = dchisq, color = 'red', args = list(df = 1)) + 
-  xlab("Test statistic") + ylab("Density")
-ggsave("oob_lrt.pdf")
+  facet_wrap(~ learner_name, scales = "free") + 
+  geom_vline(xintercept = 0, col = "red") + 
+  xlab("CPI value") + ylab("Density")
+ggsave("oob_CPI_hist.pdf")
 
