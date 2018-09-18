@@ -41,14 +41,13 @@ loop <- function(n, b) {
   t_test <- t.test(delta, alternative = 'greater')
   
   # Calculate empirical coverage at alpha = 0.05
-  se <- sd(delta) / sqrt(n)
-  cvg <- 1 - (sum(loss >= loss0 + qnorm(0.975) * se) + 
-              sum(loss <= loss0 - qnorm(0.975) * se)) / n
+  cvg <- 1 - (sum(loss >= loss0 + qnorm(0.975) * sd(delta)) + 
+              sum(loss <= loss0 - qnorm(0.975) * sd(delta))) / n
   
   # Export results
   out <- data.frame(
          'CPI' = mean(delta),
-          'SE' = se,
+          'SE' = sd(delta) / sqrt(n),
            't' = t_test$statistic,
      'p.value' = t_test$p.value,
     'Coverage' = cvg,
@@ -212,24 +211,32 @@ saveRDS(out3, 'wtd_rdm.rds')
 
 
 # PART IV
-# Check the t-statistics
+# Check t-statistics
 ggplot(out1, aes(t)) +
   geom_histogram(aes(y = ..density..), bins = 100, color = 'black') +
   stat_function(fun = dt, color = 'red', args = list(df = 999)) +  
-  theme_bw()
+  ggtitle('Variance: Homoskedastic') + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5))
 ggplot(out2, aes(t)) +
   geom_histogram(aes(y = ..density..), bins = 100, color = 'black') +
   stat_function(fun = dt, color = 'red', args = list(df = 999)) +  
-  theme_bw()
+  ggtitle('Variance: Known') + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5))
 ggplot(out3, aes(t)) +
   geom_histogram(aes(y = ..density..), bins = 100, color = 'black') +
   stat_function(fun = dt, color = 'red', args = list(df = 999)) +  
-  theme_bw()
+  ggtitle('Variance: Estimated') + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = 0.5))
 
-# Check the coverage
+# Check coverage
 rbind(out1, out2, out3) %>%
   ggplot(aes(Variance_Model, Coverage, fill = Variance_Model)) + 
   geom_boxplot() + 
   geom_hline(yintercept = 0.95, color = 'red') + 
   theme_bw() + 
   scale_fill_d3()
+
+
