@@ -71,8 +71,14 @@ brute_force_mlr <- function(task, learner,
     pred_reduced <- fit_learner(learner = learner, task = reduced_task, resampling = resample_instance, measure = measure, test_data = test_data, verbose = verbose)
     aggr_reduced <- performance(pred_reduced, measure)
     
+    if (log) {
+      cpi <- log(aggr_reduced) - log(aggr_full)
+    } else {
+      coi <- err_reduced - err_full
+    }
+    
     res <- data.frame(Variable = getTaskFeatureNames(task)[i],
-                      CPI = unname(aggr_reduced - aggr_full), 
+                      CPI = unname(cpi), 
                       stringsAsFactors = FALSE)
 
     # Statistical testing
