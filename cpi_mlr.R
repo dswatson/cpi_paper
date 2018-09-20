@@ -74,7 +74,7 @@ brute_force_mlr <- function(task, learner,
     if (log) {
       cpi <- log(aggr_reduced) - log(aggr_full)
     } else {
-      coi <- err_reduced - err_full
+      cpi <- err_reduced - err_full
     }
     
     res <- data.frame(Variable = getTaskFeatureNames(task)[i],
