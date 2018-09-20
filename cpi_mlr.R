@@ -27,8 +27,8 @@ brute_force_mlr <- function(task, learner,
   }
   
   if (!is.null(test)) {
-    if (!(measure$id %in% c("mse", "mae", "acc", "logloss"))) {
-      stop("Statistical testing currently only implemented for 'mse', 'mae', 'acc' and 'logloss' measures.")
+    if (!(measure$id %in% c("mse", "mae", "mmce", "logloss"))) {
+      stop("Statistical testing currently only implemented for 'mse', 'mae', 'mmce' and 'logloss' measures.")
     }
   }
   
@@ -161,8 +161,8 @@ compute_loss <- function(pred, measure) {
       truth <- match(as.character(pred$data$truth), pred$task.desc$class.levels)
       p <- mlr:::getRowEls(probabilities, truth)
       loss <- -log(p)
-    } else if (measure$id == "acc") {
-      # Accuracy
+    } else if (measure$id == "mmce") {
+      # Misclassification error
       loss <- 1*(pred$data$truth == pred$data$response)
       
       # Avoid 0 and 1
