@@ -12,7 +12,7 @@ p <- 10
 # Algorithm parameters ----------------------------------------------------------------
 learners <- c("classif.logreg", "classif.ranger", "classif.nnet", "classif.svm")
 tests <- c("t", "fisher")
-measures <- c("acc", "logloss")
+measures <- c("mmce", "logloss")
 
 
 # Registry ----------------------------------------------------------------
