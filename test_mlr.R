@@ -4,10 +4,14 @@ library(tidyr)
 source("cpi_mlr.R")
 
 # Regression
-brute_force_mlr(task = bh.task, learner = makeLearner("regr.lm"))
-brute_force_mlr(task = bh.task, learner = makeLearner("regr.lm"), measure = mae)
-brute_force_mlr(task = bh.task, learner = makeLearner("regr.lm"), test = "t")
-brute_force_mlr(task = bh.task, learner = makeLearner("regr.lm"), test = "lrt")
+brute_force_mlr(task = bh.task, learner = makeLearner("regr.lm"), 
+                resampling = makeResampleDesc("CV", iters = 5))
+brute_force_mlr(task = bh.task, learner = makeLearner("regr.lm"), 
+                resampling = makeResampleDesc("CV", iters = 5), measure = mae)
+brute_force_mlr(task = bh.task, learner = makeLearner("regr.lm"), 
+                resampling = makeResampleDesc("CV", iters = 5), test = "t")
+brute_force_mlr(task = bh.task, learner = makeLearner("regr.lm"), 
+                resampling = makeResampleDesc("CV", iters = 5), test = "t", measure = mae)
 
 # Classification (binary)
 brute_force_mlr(task = pid.task, learner = makeLearner("classif.logreg", predict.type = "prob"))

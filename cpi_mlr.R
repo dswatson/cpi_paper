@@ -7,9 +7,9 @@ brute_force_mlr <- function(task, learner,
                             resampling = NULL,
                             test_data = NULL,
                             measure = NULL,
-                            test = NULL,
-                            permute = FALSE,
-                            log = FALSE,
+                            test = "t",
+                            permute = TRUE,
+                            log = TRUE,
                             verbose = FALSE, 
                             cores = 1) {
   if (is.null(measure)) {
@@ -22,9 +22,13 @@ brute_force_mlr <- function(task, learner,
     }
   }
   
+  if (is.character(measure)) {
+    measure <- eval(parse(text = measure))
+  }
+  
   if (!is.null(test)) {
-    if (!(measure$id %in% c("mse", "logloss"))) {
-      stop("Statistical testing currently only implemented for 'mse' and 'logloss' measure.")
+    if (!(measure$id %in% c("mse", "mae", "acc", "logloss"))) {
+      stop("Statistical testing currently only implemented for 'mse', 'mae', 'acc' and 'logloss' measures.")
     }
   }
   
@@ -51,7 +55,7 @@ brute_force_mlr <- function(task, learner,
   pred_full <- fit_learner(learner = learner, task = task, resampling = resample_instance, measure = measure, test_data = test_data, verbose = verbose)
   aggr_full <- performance(pred_full, measure)
   if (!is.null(test)) {
-    err_full <- compute_loss(pred_full)
+    err_full <- compute_loss(pred_full, measure)
   }
   
   # For each feature, fit reduced model and return difference in error
@@ -70,12 +74,10 @@ brute_force_mlr <- function(task, learner,
     res <- data.frame(Variable = getTaskFeatureNames(task)[i],
                       CPI = unname(aggr_reduced - aggr_full), 
                       stringsAsFactors = FALSE)
-                      
-                      browser()
 
     # Statistical testing
     if (!is.null(test)) {
-      err_reduced <- compute_loss(pred_reduced)
+      err_reduced <- compute_loss(pred_reduced, measure)
       if (log) {
         dif <- log(err_reduced) - log(err_full)
       } else {
@@ -84,7 +86,7 @@ brute_force_mlr <- function(task, learner,
       if (test == "fisher") {
         orig_mean <- mean(dif)
         
-        # B permutation
+        # B permutations
         B <- 10000
         perm_means <- replicate(B, {
           signs <- sample(c(-1, 1), length(dif), replace = TRUE)
@@ -93,10 +95,6 @@ brute_force_mlr <- function(task, learner,
         res$p.value <- sum(perm_means >= orig_mean)/B
       } else if (test == "t") {
         test_result <- t.test(dif, alternative = 'greater')
-        res$statistic <- test_result$statistic
-        res$p.value <- test_result$p.value
-      } else if (test == "U") {
-        test_result <- wilcox.test(dif, alternative = 'greater', exact = FALSE)
         res$statistic <- test_result$statistic
         res$p.value <- test_result$p.value
       } else {
@@ -139,22 +137,38 @@ fit_learner <- function(learner, task, resampling = NULL, measure = NULL, test_d
   pred
 }
 
-compute_loss <- function(pred) {
+compute_loss <- function(pred, measure) {
   if (getTaskType(pred) == "regr") {
-    # MSE
-    loss <- (pred$data$truth - pred$data$response)^2
+    if (measure$id == "mse") {
+      # Squared errors
+      loss <- (pred$data$truth - pred$data$response)^2
+    } else if (measure$id == "mae") {
+      # Absolute errors
+      loss <- abs(pred$data$truth - pred$data$response)
+    } else {
+      stop("Unknown measure.")
+    }
   } else if (getTaskType(pred) == "classif") {
-    # logloss (taken from mlr::measureLogloss)
-    probabilities <- pred$data[, paste("prob", pred$task.desc$class.levels, sep = ".")]
+    if (measure$id == "logloss") {
+      # logloss (taken from mlr::measureLogloss)
+      probabilities <- pred$data[, paste("prob", pred$task.desc$class.levels, sep = ".")]
+      
+      #let's confine the predicted probabilities to [eps,1 - eps], so logLoss doesn't reach infinity under any circumstance
+      eps <- 1e-15
+      probabilities[probabilities > 1 - eps] <- 1 - eps
+      probabilities[probabilities < eps] <- eps
+      
+      truth <- match(as.character(pred$data$truth), pred$task.desc$class.levels)
+      p <- mlr:::getRowEls(probabilities, truth)
+      loss <- -log(p)
+    } else if (measure$id == "acc") {
+      # Accuracy
+      loss <- 1*(pred$data$truth == pred$data$response)
+    } else {
+      stop("Unknown measure.")
+    }
     
-    #let's confine the predicted probabilities to [eps,1 - eps], so logLoss doesn't reach infinity under any circumstance
-    eps <- 1e-15
-    probabilities[probabilities > 1 - eps] <- 1 - eps
-    probabilities[probabilities < eps] <- eps
     
-    truth <- match(as.character(pred$data$truth), pred$task.desc$class.levels)
-    p <- mlr:::getRowEls(probabilities, truth)
-    loss <- -log(p)
   } else {
     stop("Unknown task type.")
   }
