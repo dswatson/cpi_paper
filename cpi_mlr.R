@@ -169,7 +169,7 @@ compute_loss <- function(pred, measure) {
       loss <- -log(p)
     } else if (measure$id == "mmce") {
       # Misclassification error
-      loss <- 1*(pred$data$truth == pred$data$response)
+      loss <- 1*(pred$data$truth != pred$data$response)
       
       # Avoid 0 and 1
       eps <- 1e-15
