@@ -164,6 +164,11 @@ compute_loss <- function(pred, measure) {
     } else if (measure$id == "acc") {
       # Accuracy
       loss <- 1*(pred$data$truth == pred$data$response)
+      
+      # Avoid 0 and 1
+      eps <- 1e-15
+      loss[loss > 1 - eps] <- 1 - eps
+      loss[loss < eps] <- eps
     } else {
       stop("Unknown measure.")
     }
