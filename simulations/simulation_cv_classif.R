@@ -5,12 +5,12 @@ library(ggplot2)
 library(ggsci)
 
 # Simulation parameters ----------------------------------------------------------------
-num_replicates <- 1000
+num_replicates <- 10000
 n <- 1000
 p <- 10
 
 # Algorithm parameters ----------------------------------------------------------------
-learners <- c("classif.logreg", "classif.ranger", "classif.nnet", "classif.svm")
+learners <- c("classif.logreg", "classif.ranger", "classif.nnet", "classif.kknn")
 tests <- c("t", "fisher")
 measures <- c("mmce", "logloss")
 
@@ -31,8 +31,9 @@ addProblem(name = "nonlinear", fun = nonlinear_data)
 cpi <- function(data, job, instance, learner_name, ...) {
   par.vals <- switch(learner_name, 
                      classif.ranger = list(num.trees = 50), 
-                     classif.nnet = list(size = 3, decay = 1, trace = FALSE), 
-                     classif.svm = list(kernel = "radial"), 
+                     classif.nnet = list(size = 3, decay = .1, trace = FALSE), 
+                     #classif.svm = list(kernel = "radial"), 
+                     classif.kknn = list(k = 30), 
                      list())
   as.list(brute_force_mlr(task = instance, learner = makeLearner(learner_name, par.vals = par.vals, predict.type = "prob"), 
                           resampling = makeResampleDesc("CV", iters = 5), ...))
@@ -72,9 +73,9 @@ res_wide <- flatten(flatten(ijoin(reduceResultsDataTable(), getJobPars())))
 res <- melt(res_wide, measure.vars = patterns("^Variable*", "^CPI*", "^statistic*", "^p.value*"), 
             value.name = c("Variable", "CPI", "Statistic", "p.value"))
 res[, Variable := factor(Variable, levels = paste0("x", 1:unique(p)))]
-res[, Learner := factor(learner_name, 
-                levels = c("classif.logreg", "classif.ranger", "classif.nnet", "classif.svm"), 
-                labels = c("LM", "RF", "NN", "SVM"))]
+res[, Learner := factor(learner_name,
+                levels = c("classif.logreg", "classif.ranger", "classif.nnet", "classif.kknn"),
+                labels = c("LR", "RF", "ANN", "kNN"))]
 res[, Problem := factor(problem, 
                 levels = c("linear", "nonlinear"), 
                 labels = c("Linear", "Non-linear"))]
@@ -113,7 +114,7 @@ lapply(unique(res$test), function(tt) {
     ggplot(res_mean[test == tt & measure == m, ], aes(x = Variable, y = power, col = Learner, shape = Learner)) + 
       geom_line() + geom_point() + 
       facet_wrap(~ Problem) + 
-      geom_hline(yintercept = 0.05, col = "black") + 
+      geom_hline(yintercept = 0.05, col = "black", linetype = "dashed") + 
       scale_color_npg() + 
       xlab("Effect size") + ylab("Rejected hypotheses")
     ggsave(paste0("cv_classif_power_", tt, "_", m, ".pdf"), width = 10, height = 5)
