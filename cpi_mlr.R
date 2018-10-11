@@ -28,8 +28,8 @@ brute_force_mlr <- function(task, learner,
   }
   
   if (!is.null(test)) {
-    if (!(measure$id %in% c("mse", "mae", "mmce", "logloss"))) {
-      stop("Statistical testing currently only implemented for 'mse', 'mae', 'mmce' and 'logloss' measures.")
+    if (!(measure$id %in% c("mse", "mae", "mmce", "logloss", "brier"))) {
+      stop("Statistical testing currently only implemented for 'mse', 'mae', 'mmce', 'logloss' and 'brier' measures.")
     }
   }
   
@@ -170,6 +170,15 @@ compute_loss <- function(pred, measure) {
     } else if (measure$id == "mmce") {
       # Misclassification error
       loss <- 1*(pred$data$truth != pred$data$response)
+      
+      # Avoid 0 and 1
+      eps <- 1e-15
+      loss[loss > 1 - eps] <- 1 - eps
+      loss[loss < eps] <- eps
+    } else if (measure$id == "brier") {
+      # Brier score
+      y <- as.numeric(pred$data$truth == pred$task.desc$positive)
+      loss <- (y - pred$data$prob.pos)^2
       
       # Avoid 0 and 1
       eps <- 1e-15
