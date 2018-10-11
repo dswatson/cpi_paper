@@ -10,6 +10,7 @@ brute_force_mlr <- function(task, learner,
                             test = "t",
                             permute = TRUE,
                             log = TRUE,
+                            B = 10000,
                             verbose = FALSE, 
                             cores = 1) {
   if (is.null(measure)) {
@@ -93,7 +94,6 @@ brute_force_mlr <- function(task, learner,
         orig_mean <- mean(dif)
         
         # B permutations
-        B <- 10000
         perm_means <- replicate(B, {
           signs <- sample(c(-1, 1), length(dif), replace = TRUE)
           mean(signs * dif)
