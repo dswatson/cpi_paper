@@ -31,7 +31,7 @@ addProblem(name = "nonlinear", fun = nonlinear_data)
 cpi <- function(data, job, instance, learner_name, ...) {
   par.vals <- switch(learner_name, 
                      classif.ranger = list(num.trees = 50), 
-                     classif.nnet = list(size = 3, decay = .4, trace = FALSE), 
+                     classif.nnet = list(size = 10, decay = .1, trace = FALSE), 
                      #classif.svm = list(kernel = "radial"), 
                      classif.kknn = list(k = 30), 
                      list())
@@ -72,7 +72,9 @@ waitForJobs()
 res_wide <- flatten(flatten(ijoin(reduceResultsDataTable(), getJobPars())))
 res <- melt(res_wide, measure.vars = patterns("^Variable*", "^CPI*", "^statistic*", "^p.value*"), 
             value.name = c("Variable", "CPI", "Statistic", "p.value"))
-res[, Variable := factor(Variable, levels = paste0("x", 1:unique(p)))]
+res[, Variable := factor(Variable,
+                         levels = paste0("x", 1:unique(p)), 
+                         labels = paste0("X", 1:unique(p)))]
 res[, Learner := factor(learner_name, 
                         levels = c("classif.logreg", "classif.kknn", "classif.ranger", "classif.nnet"), 
                         labels = c("Logistic regression", "k-nearest neighbors", "Random forest", "Neural network"))]
@@ -94,7 +96,7 @@ lapply(unique(res$measure), function(m) {
 
 # Histograms of t-test statistics (only null variables)
 lapply(unique(res$measure), function(m) {
-  ggplot(res[measure == m & test == "t" & Variable %in% c("x1", "x2"), ], aes(Statistic)) +
+  ggplot(res[measure == m & test == "t" & Variable %in% c("X1", "X2"), ], aes(Statistic)) +
     geom_histogram(aes(y = ..density..), bins = 100) +
     facet_grid(Problem ~ Learner) +
     stat_function(fun = dt, color = 'red', args = list(df = unique(res$n) - 1)) +
