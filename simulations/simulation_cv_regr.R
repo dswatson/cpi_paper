@@ -5,7 +5,7 @@ library(ggplot2)
 library(ggsci)
 
 # Simulation parameters ----------------------------------------------------------------
-num_replicates <- 10000
+num_replicates <- 1000 #10000
 n <- 1000
 p <- 10
 
@@ -31,7 +31,7 @@ addProblem(name = "nonlinear", fun = nonlinear_data)
 cpi <- function(data, job, instance, learner_name, ...) {
   par.vals <- switch(learner_name, 
                      regr.ranger = list(num.trees = 50), 
-                     regr.nnet = list(size = 3, decay = .1, trace = FALSE), 
+                     regr.nnet = list(size = 3, decay = .4, trace = FALSE), 
                      #regr.svm = list(kernel = "radial"), 
                      regr.kknn = list(k = 30), 
                      list())
@@ -74,11 +74,11 @@ res <- melt(res_wide, measure.vars = patterns("^Variable*", "^CPI*", "^statistic
             value.name = c("Variable", "CPI", "Statistic", "p.value"))
 res[, Variable := factor(Variable, levels = paste0("x", 1:unique(p)))]
 res[, Learner := factor(learner_name, 
-                levels = c("regr.lm", "regr.ranger", "regr.nnet", "regr.kknn"), 
-                labels = c("LM", "RF", "ANN", "kNN"))]
+                        levels = c("regr.lm", "regr.kknn", "regr.ranger", "regr.nnet"), 
+                        labels = c("Linear model", "k-nearest neighbors", "Random forest", "Neural network"))]
 res[, Problem := factor(problem, 
-                levels = c("linear", "nonlinear"), 
-                labels = c("Linear", "Non-linear"))]
+                        levels = c("linear", "nonlinear"), 
+                        labels = c("Linear data", "Non-linear data"))]
 saveRDS(res, "simulation_cv_regr.Rds")
 
 # Plots -------------------------------------------------------------
@@ -108,16 +108,14 @@ res_mean <- res[, .(power = mean(reject, na.rm = TRUE)), by = .(Problem, algorit
 levels(res_mean$Variable) <- rep(c(0, 0, -.5, .5, -1, 1, -1.5, 1.5, -2, 2), each = p/10)
 res_mean[, Variable := abs(as.numeric(as.character(Variable)))]
 res_mean[, power := mean(power), by = list(Problem, algorithm, Learner, test, Variable, measure)]
-#res_mean[, Test := factor(test, levels = c("fisher", "t"), labels = c("Fisher", "t-test"))]
-lapply(unique(res$test), function(tt) {
-  lapply(unique(res$measure), function(m) {
-    ggplot(res_mean[test == tt & measure == m, ], aes(x = Variable, y = power, col = Learner, shape = Learner)) + 
-      geom_line() + geom_point() + 
-      facet_wrap(~ Problem) + 
-      geom_hline(yintercept = 0.05, col = "black", linetype = "dashed") + 
-      scale_color_npg() + 
-      xlab("Effect size") + ylab("Rejected hypotheses")
-    ggsave(paste0("cv_regr_power_", tt, "_", m, ".pdf"), width = 10, height = 5)
-  })
+res_mean[, Test := factor(test, levels = c("fisher", "t"), labels = c("Fisher", "t-test"))]
+lapply(unique(res$measure), function(m) {
+  ggplot(res_mean[measure == m, ], aes(x = Variable, y = power, col = Learner, shape = Learner, linetype = Test)) +
+    geom_line() + geom_point() +
+    facet_wrap(~ Problem) +
+    geom_hline(yintercept = 0.05, col = "black", linetype = "dashed") +
+    scale_color_npg() +
+    xlab("Effect size") + ylab("Rejected hypotheses")
+  ggsave(paste0("cv_regr_power_", m, ".pdf"), width = 10, height = 5)
 })
 

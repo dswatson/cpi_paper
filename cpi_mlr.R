@@ -72,7 +72,7 @@ brute_force_mlr <- function(task, learner,
     pred_reduced <- fit_learner(learner = learner, task = reduced_task, resampling = resample_instance, measure = measure, test_data = test_data, verbose = verbose)
     aggr_reduced <- performance(pred_reduced, measure)
     
-    if (log & measure$id != "logloss") {
+    if (log) { #  & measure$id != "logloss"
       cpi <- log(aggr_reduced) - log(aggr_full)
     } else {
       cpi <- aggr_reduced - aggr_full
@@ -85,7 +85,7 @@ brute_force_mlr <- function(task, learner,
     # Statistical testing
     if (!is.null(test)) {
       err_reduced <- compute_loss(pred_reduced, measure)
-      if (log & measure$id != "logloss") {
+      if (log) { #  & measure$id != "logloss"
         dif <- log(err_reduced) - log(err_full)
       } else {
         dif <- err_reduced - err_full
@@ -178,8 +178,7 @@ compute_loss <- function(pred, measure) {
     } else if (measure$id == "brier") {
       # Brier score
       y <- as.numeric(pred$data$truth == pred$task.desc$positive)
-      probabilities <- pred$data[, paste("prob", pred$task.desc$positive, sep = ".")]
-      loss <- (y - probabilities)^2
+      loss <- (y - pred$data$prob.pos)^2
       
       # Avoid 0 and 1
       eps <- 1e-15
@@ -195,4 +194,3 @@ compute_loss <- function(pred, measure) {
   }
   loss
 }
-
