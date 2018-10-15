@@ -5,7 +5,7 @@ library(ggplot2)
 library(ggsci)
 
 # Simulation parameters ----------------------------------------------------------------
-num_replicates <- 1000 #10000
+num_replicates <- 10000
 n <- 1000
 p <- 10
 
