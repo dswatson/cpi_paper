@@ -87,11 +87,12 @@ saveRDS(res, "simulation_cv_regr.Rds")
 # Boxplots of CPI values per variable
 lapply(unique(res$measure), function(m) {
   ggplot(res[measure == m, ], aes(x = Variable, y = CPI)) + 
-    geom_boxplot(outlier.size = .5) + 
+    geom_boxplot(outlier.size = .01) + 
     facet_grid(Problem ~ Learner, scales = "free") + 
     geom_hline(yintercept = 0, col = "red") + 
     xlab("Variable") + ylab("CPI value")
   ggsave(paste0("cv_regr_CPI_", m, ".pdf"), width = 10, height = 5)
+  ggsave(paste0("cv_regr_CPI_", m, ".png"), width = 10, height = 5, dpi = 300)
 })
 
 # Histograms of t-test statistics (only null variables)
