@@ -15,6 +15,7 @@ res <- replicate(1000, {
 loss1 <- res[, 1, ]
 loss2 <- res[, 2, ]
 dif <- loss1 - loss2
+log_dif <- log(loss1) - log(loss2)
 
 # Same results as before (but without any model)
 plot(loss1[, 1], loss2[, 2])
