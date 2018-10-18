@@ -49,15 +49,57 @@ loop <- function(b, k, n, p) {
 # Iterate
 out <- foreach(b = seq_len(1e4), .combine = rbind) %dopar% 
   loop(b, k = 10, n = n, p = p)
+saveRDS(out, 'lm_test.rds')
+
+mu <- out %>%
+  group_by(Run) %>%
+  summarise(full = mean(full),
+            x1 = mean(x1),
+            x2 = mean(x2),
+            x3 = mean(x3),
+            x4 = mean(x4),
+            x5 = mean(x5),
+            x6 = mean(x6),
+            x7 = mean(x7),
+            x8 = mean(x8),
+            x9 = mean(x9),
+            x10 = mean(x10))
+sigma <- out %>%
+  group_by(Run) %>%
+  summarise(full = sd(full),
+            x1 = sd(x1),
+            x2 = sd(x2),
+            x3 = sd(x3),
+            x4 = sd(x4),
+            x5 = sd(x5),
+            x6 = sd(x6),
+            x7 = sd(x7),
+            x8 = sd(x8),
+            x9 = sd(x9),
+            x10 = sd(x10))
+rss <- out %>%
+  group_by(Run) %>%
+  summarise(full = sum(full),
+            x1 = sum(x1),
+            x2 = sum(x2),
+            x3 = sum(x3),
+            x4 = sum(x4),
+            x5 = sum(x5),
+            x6 = sum(x6),
+            x7 = sum(x7),
+            x8 = sum(x8),
+            x9 = sum(x9),
+            x10 = sum(x10))
+
 
 # Run t-tests
 t_test <- function(b, j) {
   tmp <- out %>% filter(Run == b)
   delta <- tmp[[j]] - tmp$full
   cpi <- mean(delta)
-  sigma <- sd(delta) / sqrt(n)
+  se <- sd(delta) / sqrt(n)
   t_test <- t.test(delta, alternative = 'greater')
-  out <- c(cpi, sigma, t_test$statistic, t_test$p.value)
+  out <- c(cpi, se, t_test$statistic, t_test$p.value)
   return(out)
 }
 
