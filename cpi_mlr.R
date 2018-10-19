@@ -178,7 +178,7 @@ compute_loss <- function(pred, measure) {
     } else if (measure$id == "brier") {
       # Brier score
       y <- as.numeric(pred$data$truth == pred$task.desc$positive)
-      loss <- (y - pred$data$prob.pos)^2
+      loss <- (y - pred$data[, paste("prob", pred$task.desc$positive, sep = ".")])^2
       
       # Avoid 0 and 1
       eps <- 1e-15
