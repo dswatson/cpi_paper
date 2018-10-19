@@ -90,6 +90,7 @@ brute_force_mlr <- function(task, learner,
       } else {
         dif <- err_reduced - err_full
       }
+      res$CPI <- mean(dif)
       if (test == "fisher") {
         orig_mean <- mean(dif)
         
@@ -98,12 +99,10 @@ brute_force_mlr <- function(task, learner,
           signs <- sample(c(-1, 1), length(dif), replace = TRUE)
           mean(signs * dif)
         })
-        res$CPI <- dif
         res$p.value <- sum(perm_means >= orig_mean)/B
         res$ci_lo <- orig_mean - quantile(perm_means, 1 - alpha)
       } else if (test == "t") {
         test_result <- t.test(dif, alternative = 'greater')
-        res$CPI <- dif
         res$SE <- sd(dif) / sqrt(length(dif))
         res$statistic <- test_result$statistic
         res$p.value <- test_result$p.value
