@@ -37,8 +37,8 @@ loop <- function(n, b) {
   loss02 <- (test02$y - y_hat02)^2
   
   # Define and test delta vectors
-  delta1 <- loss01 - loss
-  delta0 <- loss02 - loss01
+  delta1 <- log(loss01 / loss)
+  delta0 <- log(loss02 / loss01)
   delta <- delta1 - delta0
   t_test <- t.test(delta, alternative = 'greater')
   
@@ -48,7 +48,7 @@ loop <- function(n, b) {
      'SE' = sd(delta) / sqrt(n),
       't' = t_test$statistic,
 'p.value' = t_test$p.value,
-     'Run' = b
+    'Run' = b
   )
   return(out)
   
@@ -59,6 +59,16 @@ out <- foreach(b = seq_len(1e5), .combine = rbind) %dopar%
   loop(n = 1000, b = b)
 saveRDS(out, 'dperm.rds')
 
+# This method seems to get the standard errors just about right - 
+# but introduces bias for some reason? By which I mean t-statistics would
+# just about fit their expected curve if we add ncp = mean(out$t), which is
+# around 0.064, FYI. Interestingly, t.test(out$CPI) consistently indicates
+# that the CPI itself is unbiased (insigificantly different from 0),
+# which means the problem is - once again - heteroskedasticity. There's a 
+# *highly significant* negative correlation between CPI and SE, which means
+# higher CPIs are associated with lower SEs, thereby artificially boosting 
+# t-stats for the upper portions of the CPI distro. Our sample size n is 
+# constant, which means the problem is sd(delta) ~ mean(delta).
 
 
 
