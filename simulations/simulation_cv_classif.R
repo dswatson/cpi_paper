@@ -31,7 +31,7 @@ addProblem(name = "nonlinear", fun = nonlinear_data)
 cpi <- function(data, job, instance, learner_name, ...) {
   par.vals <- switch(learner_name, 
                      classif.ranger = list(num.trees = 50), 
-                     classif.nnet = list(size = 10, decay = .1, trace = FALSE), 
+                     classif.nnet = list(size = 20, decay = .1, trace = FALSE), 
                      #classif.svm = list(kernel = "radial"), 
                      classif.kknn = list(k = 30), 
                      list())
@@ -118,6 +118,7 @@ lapply(unique(res$measure), function(m) {
     facet_wrap(~ Problem) +
     geom_hline(yintercept = 0.05, col = "black", linetype = "dashed") +
     scale_color_npg() +
+    scale_y_continuous(breaks = c(0, .05, .25, .5, .75, 1), limits = c(0, 1)) + 
     xlab("Effect size") + ylab("Rejected hypotheses")
   ggsave(paste0("cv_classif_power_", m, ".pdf"), width = 10, height = 5)
 })
