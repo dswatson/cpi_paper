@@ -72,8 +72,8 @@ brute_force_mlr <- function(task, learner,
     pred_reduced <- fit_learner(learner = learner, task = reduced_task, resampling = resample_instance, measure = measure, test_data = test_data, verbose = verbose)
     aggr_reduced <- performance(pred_reduced, measure)
     
-    if (log) { #  & measure$id != "logloss"
-      cpi <- log(aggr_reduced) - log(aggr_full)
+    if (log) { 
+      cpi <- log(aggr_reduced / aggr_full)
     } else {
       cpi <- aggr_reduced - aggr_full
     }
@@ -85,8 +85,8 @@ brute_force_mlr <- function(task, learner,
     # Statistical testing
     if (!is.null(test)) {
       err_reduced <- compute_loss(pred_reduced, measure)
-      if (log) { #  & measure$id != "logloss"
-        dif <- log(err_reduced) - log(err_full)
+      if (log) {
+        dif <- log(err_reduced / err_full)
       } else {
         dif <- err_reduced - err_full
       }
@@ -98,10 +98,12 @@ brute_force_mlr <- function(task, learner,
           signs <- sample(c(-1, 1), length(dif), replace = TRUE)
           mean(signs * dif)
         })
+        res$CPI <- dif
         res$p.value <- sum(perm_means >= orig_mean)/B
         res$ci_lo <- orig_mean - quantile(perm_means, 1 - alpha)
       } else if (test == "t") {
         test_result <- t.test(dif, alternative = 'greater')
+        res$CPI <- dif
         res$SE <- sd(dif) / sqrt(length(dif))
         res$statistic <- test_result$statistic
         res$p.value <- test_result$p.value
