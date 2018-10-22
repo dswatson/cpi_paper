@@ -15,7 +15,7 @@ tests <- c("t", "fisher")
 measures <- c("mse", "mae")
 
 # Registry ----------------------------------------------------------------
-reg_name <- "cpi_sim_holdout_regr"
+reg_name <- "cpi_sim_cv_regr_logratio"
 reg_dir <- file.path("registries", reg_name)
 dir.create("registries", showWarnings = FALSE)
 unlink(reg_dir, recursive = TRUE)
@@ -35,7 +35,7 @@ cpi <- function(data, job, instance, learner_name, ...) {
                      regr.svm = list(kernel = "radial"), 
                      list())
   as.list(brute_force_mlr(task = instance, learner = makeLearner(learner_name, par.vals = par.vals), 
-                          resampling = makeResampleDesc("Holdout"), ...))
+                          resampling = makeResampleDesc("CV", iters = 5), ...))
 }
 addAlgorithm(name = "cpi", fun = cpi)
 
@@ -69,8 +69,8 @@ waitForJobs()
 
 # Get results -------------------------------------------------------------
 res_wide <- flatten(flatten(ijoin(reduceResultsDataTable(), getJobPars())))
-res <- melt(res_wide, measure.vars = patterns("^Variable*", "^CPI*", "^statistic*", "^p.value*"), 
-            value.name = c("Variable", "CPI", "Statistic", "p.value"))
+res <- melt(res_wide, measure.vars = patterns("^Variable*", "^CPI*", "^SE*", "^statistic*", "^p.value*", "^ci_low*"), 
+            value.name = c("Variable", "CPI", "SE", "Statistic", "p.value", "CI_low"))
 res[, Variable := factor(Variable,
                          levels = paste0("x", 1:unique(p)), 
                          labels = paste0("X", 1:unique(p)))]
@@ -80,7 +80,7 @@ res[, Learner := factor(learner_name,
 res[, Problem := factor(problem, 
                         levels = c("linear", "nonlinear"), 
                         labels = c("Linear data", "Non-linear data"))]
-saveRDS(res, "simulation_holdout_regr.Rds")
+saveRDS(res, "simulation_cv_regr_logratio.Rds")
 
 # Plots -------------------------------------------------------------
 # Boxplots of CPI values per variable
@@ -90,8 +90,8 @@ lapply(unique(res$measure), function(m) {
     facet_grid(Problem ~ Learner, scales = "free") + 
     geom_hline(yintercept = 0, col = "red") + 
     xlab("Variable") + ylab("CPI value")
-  ggsave(paste0("holdout_regr_CPI_", m, ".pdf"), width = 10, height = 5)
-  #ggsave(paste0("holdout_regr_CPI_", m, ".png"), width = 10, height = 5, dpi = 300)
+  ggsave(paste0("cv_regr_logratio_CPI_", m, ".pdf"), width = 10, height = 5)
+  #ggsave(paste0("cv_regr_logratio_CPI_", m, ".png"), width = 10, height = 5, dpi = 300)
 })
 
 # Histograms of t-test statistics (only null variables)
@@ -101,8 +101,11 @@ lapply(unique(res$measure), function(m) {
     facet_grid(Problem ~ Learner) +
     stat_function(fun = dt, color = 'red', args = list(df = unique(res$n) - 1)) +
     xlab("Test statistic") + ylab("Density")
-  ggsave(paste0("holdout_regr_tstat_", m, ".pdf"), width = 10, height = 5)
+  ggsave(paste0("cv_regr_logratio_tstat_", m, ".pdf"), width = 10, height = 5)
 })
+
+# Coverage probabilities of confidence intervals
+res[Variable %in% c("X1", "X2"), mean(CI_low < 0), by = list(measure, test, Learner, Problem)]
 
 # Power (mean over replications)
 res[, reject := p.value <= 0.05]
@@ -119,6 +122,6 @@ lapply(unique(res$measure), function(m) {
     scale_color_npg() +
     scale_y_continuous(breaks = c(0, .05, .25, .5, .75, 1), limits = c(0, 1)) + 
     xlab("Effect size") + ylab("Rejected hypotheses")
-  ggsave(paste0("holdout_regr_power_", m, ".pdf"), width = 10, height = 5)
+  ggsave(paste0("cv_regr_logratio_power_", m, ".pdf"), width = 10, height = 5)
 })
 
