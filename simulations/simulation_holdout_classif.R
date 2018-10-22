@@ -10,7 +10,7 @@ n <- 1000
 p <- 10
 
 # Algorithm parameters ----------------------------------------------------------------
-learners <- c("classif.logreg", "classif.ranger", "classif.nnet", "classif.kknn")
+learners <- c("classif.logreg", "classif.ranger", "classif.nnet", "classif.svm")
 tests <- c("t", "fisher")
 measures <- c("mmce", "logloss")
 
@@ -32,8 +32,7 @@ cpi <- function(data, job, instance, learner_name, ...) {
   par.vals <- switch(learner_name, 
                      classif.ranger = list(num.trees = 50), 
                      classif.nnet = list(size = 20, decay = .1, trace = FALSE), 
-                     #classif.svm = list(kernel = "radial"), 
-                     classif.kknn = list(k = 30), 
+                     classif.svm = list(kernel = "radial"), 
                      list())
   as.list(brute_force_mlr(task = instance, learner = makeLearner(learner_name, par.vals = par.vals, predict.type = "prob"), 
                           resampling = makeResampleDesc("Holdout"), ...))
@@ -76,8 +75,8 @@ res[, Variable := factor(Variable,
                          levels = paste0("x", 1:unique(p)), 
                          labels = paste0("X", 1:unique(p)))]
 res[, Learner := factor(learner_name, 
-                        levels = c("classif.logreg", "classif.kknn", "classif.ranger", "classif.nnet"), 
-                        labels = c("Logistic regression", "k-nearest neighbors", "Random forest", "Neural network"))]
+                        levels = c("classif.logreg", "classif.svm", "classif.ranger", "classif.nnet"), 
+                        labels = c("Logistic regression", "Support vector machine", "Random forest", "Neural network"))]
 res[, Problem := factor(problem, 
                 levels = c("linear", "nonlinear"), 
                 labels = c("Linear data", "Non-linear data"))]
@@ -87,11 +86,12 @@ saveRDS(res, "simulation_holdout_classif.Rds")
 # Boxplots of CPI values per variable
 lapply(unique(res$measure), function(m) {
   ggplot(res[measure == m, ], aes(x = Variable, y = CPI)) + 
-    geom_boxplot(outlier.size = .5) + 
+    geom_boxplot(outlier.size = .01) + 
     facet_grid(Problem ~ Learner, scales = "free") + 
     geom_hline(yintercept = 0, col = "red") + 
     xlab("Variable") + ylab("CPI value")
   ggsave(paste0("holdout_classif_CPI_", m, ".pdf"), width = 10, height = 5)
+  #ggsave(paste0("holdout_classif_CPI_", m, ".png"), width = 10, height = 5, dpi = 300)
 })
 
 # Histograms of t-test statistics (only null variables)
