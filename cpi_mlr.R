@@ -2,7 +2,6 @@
 library(mlr)
 library(foreach)
 
-# TODO: Add confidence intervals
 brute_force_mlr <- function(task, learner, 
                             resampling = NULL,
                             test_data = NULL,
@@ -11,6 +10,7 @@ brute_force_mlr <- function(task, learner,
                             permute = TRUE,
                             log = TRUE,
                             B = 10000,
+                            alpha = 0.05, # for CI
                             verbose = FALSE, 
                             cores = 1) {
   if (is.null(measure)) {
@@ -72,8 +72,8 @@ brute_force_mlr <- function(task, learner,
     pred_reduced <- fit_learner(learner = learner, task = reduced_task, resampling = resample_instance, measure = measure, test_data = test_data, verbose = verbose)
     aggr_reduced <- performance(pred_reduced, measure)
     
-    if (log) { #  & measure$id != "logloss"
-      cpi <- log(aggr_reduced) - log(aggr_full)
+    if (log) { 
+      cpi <- log(aggr_reduced / aggr_full)
     } else {
       cpi <- aggr_reduced - aggr_full
     }
@@ -85,11 +85,12 @@ brute_force_mlr <- function(task, learner,
     # Statistical testing
     if (!is.null(test)) {
       err_reduced <- compute_loss(pred_reduced, measure)
-      if (log) { #  & measure$id != "logloss"
-        dif <- log(err_reduced) - log(err_full)
+      if (log) {
+        dif <- log(err_reduced / err_full)
       } else {
         dif <- err_reduced - err_full
       }
+      res$CPI <- mean(dif)
       if (test == "fisher") {
         orig_mean <- mean(dif)
         
@@ -99,10 +100,13 @@ brute_force_mlr <- function(task, learner,
           mean(signs * dif)
         })
         res$p.value <- sum(perm_means >= orig_mean)/B
+        res$ci_lo <- orig_mean - quantile(perm_means, 1 - alpha)
       } else if (test == "t") {
         test_result <- t.test(dif, alternative = 'greater')
+        res$SE <- sd(dif) / sqrt(length(dif))
         res$statistic <- test_result$statistic
         res$p.value <- test_result$p.value
+        res$ci_lo <- test_result$conf.int[1]
       } else {
         stop("Unknown test.")
       }
@@ -178,7 +182,7 @@ compute_loss <- function(pred, measure) {
     } else if (measure$id == "brier") {
       # Brier score
       y <- as.numeric(pred$data$truth == pred$task.desc$positive)
-      loss <- (y - pred$data$prob.pos)^2
+      loss <- (y - pred$data[, paste("prob", pred$task.desc$positive, sep = ".")])^2
       
       # Avoid 0 and 1
       eps <- 1e-15
