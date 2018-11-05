@@ -10,7 +10,7 @@ library(ranger)
 library(qvalue)
 library(tidyverse)
 library(doMC)
-registerDoMC(4)
+registerDoMC(12)
 
 # Import breast cancer data from Herschkowitz et al., 2007
 # (This is the data used by Wu & Smyth)
@@ -32,7 +32,7 @@ mat <- mat[rownames(mat) != '', ]
 mat <- na.omit(mat)
 
 # C2 gene sets
-c2 <- read.gmt('~/Documents/QMUL/GeneSets/c2.all.v6.2.symbols.gmt')
+c2 <- read.gmt('c2.all.v6.2.symbols.gmt')
 tmp1 <- data.table(GeneSymbol = rownames(mat))
 tmp2 <- seq_along(c2) %>%
   map_df(~ data.table(Pathway = names(c2)[.x],
@@ -50,7 +50,7 @@ c2 <- c2[keep]
 n <- ncol(mat)
 p <- nrow(mat)
 df <- data.frame(t(mat), y = clin$Basal)
-rf <- ranger(data = df, dependent.variable.name = 'y', num.trees = 2000,
+rf <- ranger(data = df, dependent.variable.name = 'y', num.trees = 1e4,
              keep.inbag = TRUE, classification = TRUE)
 
 # Cross entropy loss function
@@ -74,7 +74,7 @@ cpi <- function(pway) {
   x_r <- t(mat[other_genes, ])
   # Build null model
   df0 <- data.frame(x_s, x_r, y = clin$Basal)
-  rf0 <- ranger(data = df0, dependent.variable.name = 'y', num.trees = 2000,
+  rf0 <- ranger(data = df0, dependent.variable.name = 'y', num.trees = 1e4,
                 keep.inbag = TRUE, classification = TRUE)
   # Test CPI
   loss0 <- loss_fn(rf0, df0)
@@ -93,10 +93,10 @@ cpi <- function(pway) {
 }
 
 # Execute in parallel
-res <- foreach(p = names(c2), .combine = rbind) %dopar% cpi(p)
-res %>%
-  mutate(q.value = qvalue(p.value)$qvalues) %>%
+res <- foreach(p = names(c2), .combine = rbind) %dopar% cpi(p) 
+res <- res %>%
   arrange(p.value) %>%
-  fwrite('~/Documents/DPhil/Chapters/CPI/Results')
+  mutate(q.value = qvalue(p.value)$qvalues)
+fwrite(res, 'GeneSets_lambda.csv')
 
 
