@@ -136,5 +136,10 @@ lapply(unique(res$measure), function(m) {
 })
 
 # Coverage probabilities of confidence intervals
-res[Variable %in% c("X1", "X2"), mean(CI_low < 0), by = list(measure, test, Learner, Problem)]
-
+library(xtable)
+tab <- res[Variable %in% c("X1", "X2"), mean(CI_low < 0), by = list(measure, test, Learner, Problem)]
+invisible(lapply(unique(res$measure), function(m) {
+  tab_m <- dcast(tab[measure == m, ], Learner ~ Problem + test, value.var = "V1")
+  print(xtable(tab_m, digits = 4, caption = paste("Classif logratio", m)), booktabs = TRUE, table.placement = "htbp",
+        include.rownames = FALSE)
+}))
