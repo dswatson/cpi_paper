@@ -131,8 +131,8 @@ library(cowplot)
 lapply(unique(res$measure), function(m) {
   p <- plot_grid(plots_cpi[[m]], plots_tstat[[m]], plots_power[[m]], 
                  labels = "AUTO", ncol = 1)
-  ggplot2::ggsave(paste0("cv_classif_difference_", m, ".pdf"), plot = p, width = 10, height = 15)
-  ggplot2::ggsave(paste0("cv_classif_difference_", m, ".png"), plot = p, width = 10, height = 15, dpi = 300)
+  ggplot2::ggsave(paste0("cv_classif_difference_", m, ".pdf"), plot = p, width = 10, height = 13)
+  ggplot2::ggsave(paste0("cv_classif_difference_", m, ".png"), plot = p, width = 10, height = 13, dpi = 300)
 })
 
 # Coverage probabilities of confidence intervals

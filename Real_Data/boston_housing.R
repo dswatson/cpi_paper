@@ -27,10 +27,10 @@ cpi_svm_dif <- brute_force_mlr(task = bh.task, learner = makeLearner("regr.svm",
                                resampling = makeResampleDesc("CV", iters = 10), 
                                test = "t", measure = mse, log = FALSE)
 
-res <- rbind(data.table(Learner = "Linear model", Log = "Log ratio", cpi_lm_log[, c("Variable", "CPI", "SE", "p.value")]),
-             data.table(Learner = "Linear model", Log = "Difference", cpi_lm_dif[, c("Variable", "CPI", "SE", "p.value")]), 
-             data.table(Learner = "Support vector machine", Log = "Log ratio", cpi_svm_log[, c("Variable", "CPI", "SE", "p.value")]), 
-             data.table(Learner = "Support vector machine", Log = "Difference", cpi_svm_dif[, c("Variable", "CPI", "SE", "p.value")]))
+res <- rbind(data.table(Learner = "Linear model", Log = "Multiplicative CPI", cpi_lm_log[, c("Variable", "CPI", "SE", "p.value")]),
+             data.table(Learner = "Linear model", Log = "Additive CPI", cpi_lm_dif[, c("Variable", "CPI", "SE", "p.value")]), 
+             data.table(Learner = "Support vector machine", Log = "Multiplicative CPI", cpi_svm_log[, c("Variable", "CPI", "SE", "p.value")]), 
+             data.table(Learner = "Support vector machine", Log = "Additive CPI", cpi_svm_dif[, c("Variable", "CPI", "SE", "p.value")]))
 res[, signif := ifelse(p.value <= .05, "*", "")]
 
 ggplot(res, aes(x = Variable, fill = Learner, y = CPI, label = signif)) + 
