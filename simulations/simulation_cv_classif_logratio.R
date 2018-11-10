@@ -83,44 +83,63 @@ res[, Problem := factor(problem,
 saveRDS(res, "simulation_cv_classif_logratio.Rds")
 
 # Plots -------------------------------------------------------------
+res <- readRDS("simulation_cv_classif_logratio.Rds")
+
 # Boxplots of CPI values per variable
-lapply(unique(res$measure), function(m) {
+plots_cpi <- lapply(unique(res$measure), function(m) {
   ggplot(res[measure == m, ], aes(x = Variable, y = CPI)) + 
     geom_boxplot(outlier.size = .01) + 
     facet_grid(Problem ~ Learner, scales = "free") + 
     geom_hline(yintercept = 0, col = "red") + 
-    xlab("Variable") + ylab("CPI value")
-  ggsave(paste0("cv_classif_logratio_CPI_", m, ".pdf"), width = 10, height = 5)
-  #ggsave(paste0("cv_classif_logratio_CPI_", m, ".png"), width = 10, height = 5, dpi = 300)
+    xlab("Variable") + ylab("CPI value") + 
+    theme_bw()
 })
+names(plots_cpi) <- unique(res$measure)
 
 # Histograms of t-test statistics (only null variables)
-lapply(unique(res$measure), function(m) {
+plots_tstat <- lapply(unique(res$measure), function(m) {
   ggplot(res[measure == m & test == "t" & Variable %in% c("X1", "X2"), ], aes(Statistic)) +
     geom_histogram(aes(y = ..density..), bins = 100) +
     facet_grid(Problem ~ Learner) +
     stat_function(fun = dt, color = 'red', args = list(df = unique(res$n) - 1)) +
-    xlab("Test statistic") + ylab("Density")
-  ggsave(paste0("cv_classif_logratio_tstat_", m, ".pdf"), width = 10, height = 5)
+    xlab("Test statistic") + ylab("Density") + 
+    theme_bw()
 })
-
-# Coverage probabilities of confidence intervals
-res[Variable %in% c("X1", "X2"), mean(CI_low < 0), by = list(measure, test, Learner, Problem)]
+names(plots_tstat) <- unique(res$measure)
 
 # Power (mean over replications)
 res[, reject := p.value <= 0.05]
 res_mean <- res[, .(power = mean(reject, na.rm = TRUE)), by = .(Problem, algorithm, Learner, test, Variable, measure)]
-levels(res_mean$Variable) <- rep(c(0, 0, -.5, .5, -1, 1, -1.5, 1.5, -2, 2), each = p/10)
+levels(res_mean$Variable) <- rep(c(0, 0, -.5, .5, -1, 1, -1.5, 1.5, -2, 2), each = 1)
 res_mean[, Variable := abs(as.numeric(as.character(Variable)))]
 res_mean[, power := mean(power), by = list(Problem, algorithm, Learner, test, Variable, measure)]
 res_mean[, Test := factor(test, levels = c("fisher", "t"), labels = c("Fisher", "t-test"))]
-lapply(unique(res$measure), function(m) {
+plots_power <- lapply(unique(res$measure), function(m) {
   ggplot(res_mean[measure == m, ], aes(x = Variable, y = power, col = Learner, shape = Learner, linetype = Test)) +
     geom_line() + geom_point() +
     facet_wrap(~ Problem) +
     geom_hline(yintercept = 0.05, col = "black", linetype = "dashed") +
     scale_color_npg() +
     scale_y_continuous(breaks = c(0, .05, .25, .5, .75, 1), limits = c(0, 1)) + 
-    xlab("Effect size") + ylab("Rejected hypotheses")
-  ggsave(paste0("cv_classif_logratio_power_", m, ".pdf"), width = 10, height = 5)
+    xlab("Effect size") + ylab("Rejected hypotheses") + 
+    theme_bw()
 })
+names(plots_power) <- unique(res$measure)
+
+# Plot all in one plot
+library(cowplot)
+lapply(unique(res$measure), function(m) {
+  p <- plot_grid(plots_cpi[[m]], plots_tstat[[m]], plots_power[[m]], 
+                 labels = "AUTO", ncol = 1)
+  ggplot2::ggsave(paste0("cv_classif_logratio_", m, ".pdf"), plot = p, width = 10, height = 13)
+  ggplot2::ggsave(paste0("cv_classif_logratio_", m, ".png"), plot = p, width = 10, height = 13, dpi = 300)
+})
+
+# Coverage probabilities of confidence intervals
+library(xtable)
+tab <- res[Variable %in% c("X1", "X2"), mean(CI_low < 0), by = list(measure, test, Learner, Problem)]
+invisible(lapply(unique(res$measure), function(m) {
+  tab_m <- dcast(tab[measure == m, ], Learner ~ Problem + test, value.var = "V1")
+  print(xtable(tab_m, digits = 4, caption = paste("Classif logratio", m)), booktabs = TRUE, table.placement = "htbp",
+        include.rownames = FALSE)
+}))
