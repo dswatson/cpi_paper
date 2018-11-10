@@ -13,7 +13,7 @@ library(doMC)
 registerDoMC(4)
 
 # Set seed
-set.seed(123)
+set.seed(123, kind = "L'Ecuyer-CMRG")
 
 # Friedman1 benchmark hyperparameters
 n <- 100
