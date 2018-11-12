@@ -55,8 +55,7 @@ compute_loss <- function(trn, tst) {
   
 }
 
-# Analysis loop
-loop <- function(sim, b) {
+run <- function(sim) {
   
   # Simulate data
   if (sim == 'friedman') {
@@ -69,7 +68,7 @@ loop <- function(sim, b) {
     y <- x %*% beta + rnorm(3 * n)
     dat <- dat0 <- data.frame(x, y)
   }
-
+  
   # Split into training and test sets
   idx <- seq_len(2 * n)
   train <- dat[idx, ]
@@ -99,7 +98,7 @@ loop <- function(sim, b) {
     out <- data.table(
       'Model' = rep(models, times = 2),
       'Feature' = j,
-      'VIM' = rep(c('delta', 'lambda'), each = length(models)),
+      'VIM' = rep(c('cpi_d', 'cpi_l'), each = length(models)),
       'VI' = c(
         mean(delta$LM), mean(delta$RF), mean(delta$NN), mean(delta$SVM),
         mean(lambda$LM), mean(lambda$RF), mean(lambda$NN), mean(lambda$SVM)
@@ -235,15 +234,24 @@ loop <- function(sim, b) {
     ][Model == 'RF', MSE := mean(orig$rf_loss)
     ][Model == 'NN', MSE := mean(orig$nn_loss)
     ][Model == 'SVM', MSE := mean(orig$svm_loss)
-    ][, Simulation := sim
-    ][, Run := b]
+    ][, Simulation := sim]
+  return(out)
+
+}
+
+# Analysis loop
+loop <- function(b) {
+  
+  fri <- run('friedman')
+  lin <- run('linear')
+  out <- rbind(fri, lin)
+  out[, Run := b]
   return(out)
   
 }
 
 # Execute in parallel
-out <- foreach(sim = c('friedman', 'linear'), b = seq_len(1e4), 
-               .combine = rbind) %dopar% loop(sim, b)
+out <- foreach(b = seq_len(1e4), .combine = rbind) %dopar% loop(b)
 saveRDS(out, 'comp_sim.rds')
 
 # Empirical error rates
