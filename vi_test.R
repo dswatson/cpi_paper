@@ -243,7 +243,8 @@ loop <- function(sim, b) {
 
 # Execute in parallel
 out <- foreach(sim = c('friedman', 'linear'), b = seq_len(1e4), 
-               .combine = rbind) %dopar% loop(b)
+               .combine = rbind) %dopar% loop(sim, b)
+saveRDS(out, 'comp_sim.rds')
 
 # Empirical error rates
 FPR <- out[Feature %in% 6:10, sum(Positive) / 5e4, by = .(Model, VIM)]$V1
@@ -277,3 +278,5 @@ ggplot(df, aes(FPR, 1 - FNR, color = VIM, shape = VIM)) +
   xlim(0, 1) + ylim(0, 1) + 
   theme_bw() + 
   facet_wrap(Simulation ~ Model)
+
+
