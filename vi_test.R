@@ -34,7 +34,7 @@ compute_loss <- function(trn, tst) {
   rf_eps <- tst$y - rf_yhat
   
   # Neural network
-  nn_fit <- nnet(y ~ ., data = trn, size = 3, decay = 0.2, 
+  nn_fit <- nnet(y ~ ., data = trn, size = 20, decay = 0.1, 
                  linout = TRUE, trace = FALSE)
   nn_yhat <- predict(nn_fit, newdata = tst)
   nn_eps <- tst$y - nn_yhat
@@ -164,9 +164,8 @@ run <- function(sim) {
   }
   anova_df <- foreach(j = seq_len(p), .combine = rbind) %do% anova_fn(j)
   
-  ### Chalupka et al.'s nested models (delta and lambda),           ###
-  ### Ramsey's conditional correlation independence (CCI) test, and ###
-  ### Shah & Peters's generalised covariance measure (GCM) test     ###
+  ### Chalupka et al.'s likelihood ratio test (LRT) and     ###
+  ### Shah & Peters's generalised covariance measure (GCM)  ###
   other_fn <- function(j) {
     f <- compute_loss(train[, -j], test[, -j])
     delta <- data.table(
@@ -175,21 +174,11 @@ run <- function(sim) {
       'NN' = f$nn_loss - orig$nn_loss,
       'SVM' = f$svm_loss - orig$svm_loss
     )
-    lambda <- data.table(
-      'LM' = log(f$lm_loss / orig$lm_loss),
-      'RF' = log(f$rf_loss / orig$rf_loss),
-      'NN' = log(f$nn_loss / orig$nn_loss),
-      'SVM' = log(f$svm_loss / orig$svm_loss)
-    )
     train0 <- select(train, -y)
     colnames(train0)[j] <- 'y'
     test0 <- select(test, -y)
     colnames(test0)[j] <- 'y'
     g <- compute_loss(train0, test0)
-    cor_lm <- cor.test(f$lm_eps, g$lm_eps)
-    cor_rf <- cor.test(f$rf_eps, g$rf_eps)
-    cor_nn <- cor.test(f$nn_eps, g$nn_eps)
-    cor_svm <- cor.test(f$svm_eps, g$svm_eps)
     r_lm <- f$lm_eps * g$lm_eps
     r_rf <- f$rf_eps * g$rf_eps
     r_nn <- f$nn_eps * g$nn_eps
@@ -199,15 +188,11 @@ run <- function(sim) {
     gcm_nn <- abs((sqrt(n) * mean(r_nn)) / sqrt(mean(r_nn^2) - (mean(r_nn))^2))
     gcm_svm <- abs((sqrt(n) * mean(r_svm)) / sqrt(mean(r_svm^2) - (mean(r_svm))^2))
     data.table(
-      'Model' = rep(models, times = 4),
+      'Model' = rep(models, times = 2),
       'Feature' = j,
-      'VIM' = rep(c('nested_d', 'nested_l', 'cci', 'gcm'), 
-                  each = length(models)),
+      'VIM' = rep(c('lrt', 'gcm'), each = length(models)),
       'VI' = c(
         mean(delta$LM), mean(delta$RF), mean(delta$NN), mean(delta$SVM),
-        mean(lambda$LM), mean(lambda$RF), mean(lambda$NN), mean(lambda$SVM),
-        cor_lm$estimate^2, cor_rf$estimate^2, 
-        cor_nn$estimate^2, cor_svm$estimate^2, 
         gcm_lm, gcm_rf, gcm_nn, gcm_svm
       ),
       'p.value' = c(
@@ -215,12 +200,6 @@ run <- function(sim) {
         t.test(delta$RF, alternative = 'greater')$p.value,
         t.test(delta$NN, alternative = 'greater')$p.value,
         t.test(delta$SVM, alternative = 'greater')$p.value,
-        t.test(lambda$LM, alternative = 'greater')$p.value,
-        t.test(lambda$RF, alternative = 'greater')$p.value,
-        t.test(lambda$NN, alternative = 'greater')$p.value,
-        t.test(lambda$SVM, alternative = 'greater')$p.value,
-        cor_lm$p.value, cor_rf$p.value, 
-        cor_nn$p.value, cor_svm$p.value,
         2 * pnorm(gcm_lm, lower = FALSE), 2 * pnorm(gcm_rf, lower = FALSE),
         2 * pnorm(gcm_nn, lower = FALSE), 2 * pnorm(gcm_svm, lower = FALSE)
       )
@@ -255,36 +234,44 @@ out <- foreach(b = seq_len(1e4), .combine = rbind) %dopar% loop(b)
 saveRDS(out, 'comp_sim.rds')
 
 # Empirical error rates
-FPR <- out[Feature %in% 6:10, sum(Positive) / 5e4, by = .(Model, VIM)]$V1
-TPR <- out[Feature %in% 1:5, sum(Positive) / 5e4, by = .(Model, VIM)]$V1
-FNR <- out[Feature %in% 1:5, sum(!Positive) / 5e4, by = .(Model, VIM)]$V1
-TNR <- out[Feature %in% 6:10, sum(!Positive) / 5e4, by = .(Model, VIM)]$V1
-test_pos <- out[, sum(Positive), by = .(Model, VIM)]$V1
-FDR <- out[Feature %in% 6:10, sum(Positive), by = .(Model, VIM)]$V1 / test_pos
-test_neg <- out[, sum(!Positive), by = .(Model, VIM)]$V1
-FOR <- out[Feature %in% 1:5, sum(!Positive), by = .(Model, VIM)]$V1 / test_neg
+out[, Positive := p.value <= 0.05]
+FPR <- out[Feature %in% 6:10, sum(Positive) / 5e4, 
+           by = .(Model, VIM, Simulation)]$V1
+TPR <- out[Feature %in% 1:5, sum(Positive) / 5e4, 
+           by = .(Model, VIM, Simulation)]$V1
+test_pos <- out[, sum(Positive), 
+                by = .(Model, VIM, Simulation)]$V1
+FDR <- out[Feature %in% 6:10, sum(Positive), 
+           by = .(Model, VIM, Simulation)]$V1 / test_pos
+test_neg <- out[, sum(!Positive), 
+                by = .(Model, VIM, Simulation)]$V1
+FOR <- out[Feature %in% 1:5, sum(!Positive), 
+           by = .(Model, VIM, Simulation)]$V1 / test_neg
 df <- data.table(
   Model = c('Linear Model', 'Random Forest', 
             'Neural Network', 'Support Vector Machine'),
-  VIM = rep(c('delta', 'lambda', 'anova', 'lrt', 'cci', 'gcm'),
-            each = length(models)),  # Check order
-  FPR, TPR, FNR, TNR, FDR
+  VIM = rep(out[, unique(VIM)], each = length(models)),  
+  Simulation = rep(c('Friedman', 'Linear'), 
+                   each = length(models) * out[, length(unique(VIM))]),
+  FPR, TPR
 )
+lbls <- c(bquote('CPI'[Delta]), bquote('CPI'[lambda]),
+          'ANOVA', 'LRT', 'CCI', 'GCM')
 ggplot(df, aes(FPR, TPR, color = VIM, shape = VIM)) +
   geom_point(size = 3) + 
-  scale_color_d3() +
+  scale_color_manual(name = 'CI Test',
+                     breaks = unique(df$VIM),
+                     labels = lbls,
+                     values = pal_d3()(6)) +
+  scale_shape_manual(name = 'CI Test',
+                     breaks = unique(df$VIM),
+                     labels = lbls, 
+                     values = c(16:18, 3:5)) +
   geom_vline(xintercept = 0.05) + 
   labs(x = 'False Positive Rate', y = 'True Positive Rate') + 
   xlim(0, 1) + ylim(0, 1) + 
   theme_bw() + 
-  facet_wrap(Simulation ~ Model)
-ggplot(df, aes(FPR, 1 - FNR, color = VIM, shape = VIM)) +
-  geom_point(size = 3) + 
-  scale_color_d3() +
-  geom_vline(xintercept = 0.05) + 
-  labs(x = 'False Positive Rate', y = 'Power') + 
-  xlim(0, 1) + ylim(0, 1) + 
-  theme_bw() + 
-  facet_wrap(Simulation ~ Model)
+  facet_grid(Simulation ~ Model)
+
 
 
