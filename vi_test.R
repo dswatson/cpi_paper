@@ -14,7 +14,6 @@ registerDoMC(4)
 set.seed(123, kind = "L'Ecuyer-CMRG")
 
 # Hyperparameters
-n <- 100
 p <- 10
 
 # These will come up a lot
@@ -55,19 +54,11 @@ compute_loss <- function(trn, tst) {
   
 }
 
-run <- function(sim) {
+loop <- function(b, n) {
   
   # Simulate data
-  if (sim == 'friedman') {
-    dat <- mlbench.friedman1(3 * n)
-    dat <- dat0 <- data.frame(dat$x, y = dat$y)
-  } else if (sim == 'linear') {
-    beta <- c(seq_len(5), rep(0, times = 5))
-    x <- matrix(rnorm(3 * n * 10), ncol = 10, 
-                dimnames = list(NULL, paste0('x', seq_len(10))))
-    y <- x %*% beta + rnorm(3 * n)
-    dat <- dat0 <- data.frame(x, y)
-  }
+  dat <- mlbench.friedman1(3 * n)
+  dat <- dat0 <- data.frame(dat$x, y = dat$y)
   
   # Split into training and test sets
   idx <- seq_len(2 * n)
@@ -135,7 +126,7 @@ run <- function(sim) {
                                run_regression = FALSE)
     # Neural network
     train0$y <- orig$nn_yhat
-    nn_fit0 <- nnet(y ~ ., data = train0, size = 3, decay = 0.2, 
+    nn_fit0 <- nnet(y ~ ., data = train0, size = 20, decay = 0.1, 
                     linout = TRUE, trace = FALSE)
     nn_yhat0 <- predict(nn_fit0, newdata = test)
     vimp_nn <- vimp_regression(test$y, f1 = orig$nn_yhat, f2 = nn_yhat0, indx = j, 
@@ -164,8 +155,8 @@ run <- function(sim) {
   }
   anova_df <- foreach(j = seq_len(p), .combine = rbind) %do% anova_fn(j)
   
-  ### Chalupka et al.'s likelihood ratio test (LRT) and     ###
-  ### Shah & Peters's generalised covariance measure (GCM)  ###
+  ### Chalupka et al.'s fast conditional independence test (FCIT) and ###
+  ### Shah & Peters's generalised covariance measure (GCM)            ###
   other_fn <- function(j) {
     f <- compute_loss(train[, -j], test[, -j])
     delta <- data.table(
@@ -190,7 +181,7 @@ run <- function(sim) {
     data.table(
       'Model' = rep(models, times = 2),
       'Feature' = j,
-      'VIM' = rep(c('lrt', 'gcm'), each = length(models)),
+      'VIM' = rep(c('fcit', 'gcm'), each = length(models)),
       'VI' = c(
         mean(delta$LM), mean(delta$RF), mean(delta$NN), mean(delta$SVM),
         gcm_lm, gcm_rf, gcm_nn, gcm_svm
@@ -213,56 +204,51 @@ run <- function(sim) {
     ][Model == 'RF', MSE := mean(orig$rf_loss)
     ][Model == 'NN', MSE := mean(orig$nn_loss)
     ][Model == 'SVM', MSE := mean(orig$svm_loss)
-    ][, Simulation := sim]
+    ][, Run := b
+    ][, Size := paste0('n = ', n)]
   return(out)
 
-}
-
-# Analysis loop
-loop <- function(b) {
-  
-  fri <- run('friedman')
-  lin <- run('linear')
-  out <- rbind(fri, lin)
-  out[, Run := b]
-  return(out)
-  
 }
 
 # Execute in parallel
-out <- foreach(b = seq_len(1e4), .combine = rbind) %dopar% loop(b)
-saveRDS(out, 'comp_sim.rds')
+out <- foreach(b = seq_len(1e4), .combine = rbind) %:%
+  foreach(n = c(50, 100, 200), .combine = rbind) %dopar% 
+  loop(b, n)
+saveRDS(out, 'comp_big_sim.rds')
 
 # Empirical error rates
 out[, Positive := p.value <= 0.05]
 FPR <- out[Feature %in% 6:10, sum(Positive) / 5e4, 
-           by = .(Model, VIM, Simulation)]$V1
+           by = .(Model, VIM, Size)]$V1
 TPR <- out[Feature %in% 1:5, sum(Positive) / 5e4, 
-           by = .(Model, VIM, Simulation)]$V1
+           by = .(Model, VIM, Size)]$V1
 test_pos <- out[, sum(Positive), 
-                by = .(Model, VIM, Simulation)]$V1
+                by = .(Model, VIM, Size)]$V1
 FDR <- out[Feature %in% 6:10, sum(Positive), 
-           by = .(Model, VIM, Simulation)]$V1 / test_pos
+           by = .(Model, VIM, Size)]$V1 / test_pos
 test_neg <- out[, sum(!Positive), 
-                by = .(Model, VIM, Simulation)]$V1
+                by = .(Model, VIM, Size)]$V1
 FOR <- out[Feature %in% 1:5, sum(!Positive), 
-           by = .(Model, VIM, Simulation)]$V1 / test_neg
+           by = .(Model, VIM, Size)]$V1 / test_neg
 df <- data.table(
   Model = c('Linear Model', 'Random Forest', 
             'Neural Network', 'Support Vector Machine'),
   VIM = rep(out[, unique(VIM)], each = length(models)),  
-  Simulation = rep(c('Friedman', 'Linear'), 
-                   each = length(models) * out[, length(unique(VIM))]),
+  Size = factor(rep(c('n = 50', 'n = 100', 'n = 200'), 
+                    each = length(models) * out[, length(unique(VIM))]),
+                levels = c('n = 50', 'n = 100', 'n = 200')),
   FPR, TPR
 )
+
+# Plot results
 lbls <- c(bquote('CPI'[Delta]), bquote('CPI'[lambda]),
-          'ANOVA', 'LRT', 'CCI', 'GCM')
+          'ANOVA', 'FCIT', 'GCM')
 ggplot(df, aes(FPR, TPR, color = VIM, shape = VIM)) +
   geom_point(size = 3) + 
   scale_color_manual(name = 'CI Test',
                      breaks = unique(df$VIM),
                      labels = lbls,
-                     values = pal_d3()(6)) +
+                     values = pal_d3()(5)) +
   scale_shape_manual(name = 'CI Test',
                      breaks = unique(df$VIM),
                      labels = lbls, 
@@ -271,7 +257,7 @@ ggplot(df, aes(FPR, TPR, color = VIM, shape = VIM)) +
   labs(x = 'False Positive Rate', y = 'True Positive Rate') + 
   xlim(0, 1) + ylim(0, 1) + 
   theme_bw() + 
-  facet_grid(Simulation ~ Model)
+  facet_grid(Size ~ Model)
 
 
 
