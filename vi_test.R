@@ -1,14 +1,13 @@
 # Load libraries, register cores
 library(data.table)
-library(mlbench)
 library(ranger)
 library(nnet)
 library(e1071)
 library(vimp)
-library(tidyverse)
 library(ggsci)
+library(tidyverse)
 library(doMC)
-registerDoMC(4)
+registerDoMC(8)
 
 # Set seed
 set.seed(123, kind = "L'Ecuyer-CMRG")
@@ -54,14 +53,26 @@ compute_loss <- function(trn, tst) {
   
 }
 
-loop <- function(b, n) {
+loop <- function(b, sim, test_n) {
   
   # Simulate data
-  dat <- mlbench.friedman1(3 * n)
-  dat <- dat0 <- data.frame(dat$x, y = dat$y)
+  beta <- c(0, 0, -0.5, 0.5, -1, 1, -1.5, 1.5, -2, 2)
+  x <- matrix(runif(3 * test_n * p), ncol = p,
+              dimnames = list(NULL, paste0('x', seq_len(p))))
+  if (sim == 'linear') {
+    y <- x %*% beta + rnorm(3 * test_n)
+    dat <- dat0 <- data.frame(x, y)
+  } else if (sim == 'nonlinear') {
+    idx <- x < .25 | x > .75
+    xx <- matrix(0, nrow = 3 * test_n, ncol = p)
+    xx[idx] <- 0
+    xx[!idx] <- 1
+    y <- xx %*% beta + rnorm(3 * test_n)
+    dat <- dat0 <- data.frame(x, y)
+  }
   
   # Split into training and test sets
-  idx <- seq_len(2 * n)
+  idx <- seq_len(2 * test_n)
   train <- dat[idx, ]
   test <- dat[-idx, ]
   
@@ -70,7 +81,7 @@ loop <- function(b, n) {
   
   ### CPI ###
   cpi_fn <- function(j) {
-    dat0[, j] <- dat[sample.int(3 * n), j]
+    dat0[, j] <- dat[sample.int(3 * test_n), j]
     train0 <- dat0[idx, ]
     test0 <- dat0[-idx, ]
     null <- compute_loss(train0, test0)
@@ -87,6 +98,7 @@ loop <- function(b, n) {
       'SVM' = log(null$svm_loss / orig$svm_loss)
     )
     out <- data.table(
+      'Simulation' = sim,
       'Model' = rep(models, times = 2),
       'Feature' = j,
       'VIM' = rep(c('cpi_d', 'cpi_l'), each = length(models)),
@@ -111,7 +123,7 @@ loop <- function(b, n) {
   
   ### Williamson et al.'s nonparametric ANOVA ###
   anova_fn <- function(j) {
-    train0 <- test[, -c(j, 11)]
+    train0 <- test[, -j]
     # Linear model
     train0$y <- orig$lm_yhat
     lm_fit0 <- lm(y ~ ., data = train0)
@@ -139,6 +151,7 @@ loop <- function(b, n) {
                                 run_regression = FALSE)
     # Compute nonparametric ANOVA for each model
     data.table(
+      'Simulation' = sim,
       'Model' = models,
       'Feature' = j,
       'VIM' = 'anova',
@@ -174,11 +187,16 @@ loop <- function(b, n) {
     r_rf <- f$rf_eps * g$rf_eps
     r_nn <- f$nn_eps * g$nn_eps
     r_svm <- f$svm_eps * g$svm_eps
-    gcm_lm <- abs((sqrt(n) * mean(r_lm)) / sqrt(mean(r_lm^2) - (mean(r_lm))^2))
-    gcm_rf <- abs((sqrt(n) * mean(r_rf)) / sqrt(mean(r_rf^2) - (mean(r_rf))^2))
-    gcm_nn <- abs((sqrt(n) * mean(r_nn)) / sqrt(mean(r_nn^2) - (mean(r_nn))^2))
-    gcm_svm <- abs((sqrt(n) * mean(r_svm)) / sqrt(mean(r_svm^2) - (mean(r_svm))^2))
+    gcm_lm <- abs((sqrt(test_n) * mean(r_lm)) / 
+                    sqrt(mean(r_lm^2) - (mean(r_lm))^2))
+    gcm_rf <- abs((sqrt(test_n) * mean(r_rf)) / 
+                    sqrt(mean(r_rf^2) - (mean(r_rf))^2))
+    gcm_nn <- abs((sqrt(test_n) * mean(r_nn)) / 
+                    sqrt(mean(r_nn^2) - (mean(r_nn))^2))
+    gcm_svm <- abs((sqrt(test_n) * mean(r_svm)) / 
+                     sqrt(mean(r_svm^2) - (mean(r_svm))^2))
     data.table(
+      'Simulation' = sim,
       'Model' = rep(models, times = 2),
       'Feature' = j,
       'VIM' = rep(c('fcit', 'gcm'), each = length(models)),
@@ -205,16 +223,30 @@ loop <- function(b, n) {
     ][Model == 'NN', MSE := mean(orig$nn_loss)
     ][Model == 'SVM', MSE := mean(orig$svm_loss)
     ][, Run := b
-    ][, Size := paste0('n = ', n)]
+    ][, Size := paste0('n = ', 2 * test_n)]
   return(out)
 
 }
 
 # Execute in parallel
 out <- foreach(b = seq_len(1e4), .combine = rbind) %:%
-  foreach(n = c(50, 100, 200), .combine = rbind) %dopar% 
-  loop(b, n)
+  foreach(sim = c('linear', 'nonlinear')) %:%
+  foreach(test_n = c(50, 250, 500), .combine = rbind) %dopar% 
+  loop(b, sim, test_n)
 saveRDS(out, 'comp_big_sim.rds')
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Empirical error rates
 out[, Positive := p.value <= 0.05]
