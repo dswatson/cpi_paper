@@ -79,11 +79,15 @@ res[, Learner := factor(learner_name,
                         labels = c("Linear model", "Support vector machine", "Random forest", "Neural network"))]
 res[, Problem := factor(problem, 
                         levels = c("linear", "nonlinear"), 
-                        labels = c("Linear data", "Non-linear data"))]
+                        labels = c("Linear data", "Nonlinear data"))]
 saveRDS(res, "simulation_cv_regr_logratio.Rds")
 
 # Plots -------------------------------------------------------------
 res <- readRDS("simulation_cv_regr_logratio.Rds")
+
+res[, Problem := factor(problem, 
+                        levels = c("linear", "nonlinear"), 
+                        labels = c("Linear data", "Nonlinear data"))]
 
 # Boxplots of CPI values per variable
 plots_cpi <- lapply(unique(res$measure), function(m) {
@@ -121,8 +125,8 @@ plots_power <- lapply(unique(res$measure), function(m) {
     geom_hline(yintercept = 0.05, col = "black", linetype = "dashed") +
     scale_color_npg() +
     scale_y_continuous(breaks = c(0, .05, .25, .5, .75, 1), limits = c(0, 1)) + 
-    xlab("Effect size") + ylab("Rejected hypotheses") + 
-    theme_bw()
+    xlab("Effect size") + ylab("Rejection proportion") + 
+    theme_bw() 
 })
 names(plots_power) <- unique(res$measure)
 
