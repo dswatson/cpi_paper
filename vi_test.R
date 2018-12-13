@@ -61,15 +61,14 @@ loop <- function(b, sim, test_n) {
               dimnames = list(NULL, paste0('x', seq_len(p))))
   if (sim == 'linear') {
     y <- x %*% beta + rnorm(3 * test_n)
-    dat <- dat0 <- data.frame(x, y)
   } else if (sim == 'nonlinear') {
     idx <- x < .25 | x > .75
     xx <- matrix(0, nrow = 3 * test_n, ncol = p)
     xx[idx] <- 0
     xx[!idx] <- 1
     y <- xx %*% beta + rnorm(3 * test_n)
-    dat <- dat0 <- data.frame(x, y)
   }
+  dat <- dat0 <- data.frame(x, y)
   
   # Split into training and test sets
   idx <- seq_len(2 * test_n)
@@ -230,66 +229,57 @@ loop <- function(b, sim, test_n) {
 
 # Execute in parallel
 out <- foreach(b = seq_len(1e4), .combine = rbind) %:%
-  foreach(sim = c('linear', 'nonlinear')) %:%
+  foreach(sim = c('linear', 'nonlinear'), .combine = rbind) %:%
   foreach(test_n = c(50, 250, 500), .combine = rbind) %dopar% 
   loop(b, sim, test_n)
 saveRDS(out, 'comp_big_sim.rds')
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 # Empirical error rates
-out[, Positive := p.value <= 0.05]
-FPR <- out[Feature %in% 6:10, sum(Positive) / 5e4, 
-           by = .(Model, VIM, Size)]$V1
-TPR <- out[Feature %in% 1:5, sum(Positive) / 5e4, 
-           by = .(Model, VIM, Size)]$V1
-test_pos <- out[, sum(Positive), 
-                by = .(Model, VIM, Size)]$V1
-FDR <- out[Feature %in% 6:10, sum(Positive), 
-           by = .(Model, VIM, Size)]$V1 / test_pos
-test_neg <- out[, sum(!Positive), 
-                by = .(Model, VIM, Size)]$V1
-FOR <- out[Feature %in% 1:5, sum(!Positive), 
-           by = .(Model, VIM, Size)]$V1 / test_neg
-df <- data.table(
-  Model = c('Linear Model', 'Random Forest', 
-            'Neural Network', 'Support Vector Machine'),
-  VIM = rep(out[, unique(VIM)], each = length(models)),  
-  Size = factor(rep(c('n = 50', 'n = 100', 'n = 200'), 
-                    each = length(models) * out[, length(unique(VIM))]),
-                levels = c('n = 50', 'n = 100', 'n = 200')),
-  FPR, TPR
-)
+out[, Rejected := p.value <= 0.05
+  ][Feature %in% 1:2, EffSize := 0
+  ][Feature %in% 3:4, EffSize := 0.5
+  ][Feature %in% 5:6, EffSize := 1
+  ][Feature %in% 7:8, EffSize := 1.5
+  ][Feature %in% 9:10, EffSize := 2]
+df <- out[, .(RejRate = mean(Rejected)), 
+          by = .(Simulation, Model, EffSize, VIM, Size)]
+df[Simulation == 'linear', Simulation := 'Linear data'
+  ][Simulation == 'nonlinear', Simulation := 'Nonlinear data'
+  ][Model == 'LM', Model := 'Linear model'
+  ][Model == 'RF', Model := 'Random forest'
+  ][Model == 'NN', Model := 'Neural network'
+  ][Model == 'SVM', Model := 'Support vector machine'
+  ][, Model := factor(Model, levels = c('Linear model', 'Support vector machine',
+                                        'Random forest', 'Neural network'))]
 
 # Plot results
 lbls <- c(bquote('CPI'[Delta]), bquote('CPI'[lambda]),
           'ANOVA', 'FCIT', 'GCM')
-ggplot(df, aes(FPR, TPR, color = VIM, shape = VIM)) +
-  geom_point(size = 3) + 
-  scale_color_manual(name = 'CI Test',
-                     breaks = unique(df$VIM),
-                     labels = lbls,
-                     values = pal_d3()(5)) +
-  scale_shape_manual(name = 'CI Test',
-                     breaks = unique(df$VIM),
-                     labels = lbls, 
-                     values = c(16:18, 3:5)) +
-  geom_vline(xintercept = 0.05) + 
-  labs(x = 'False Positive Rate', y = 'True Positive Rate') + 
-  xlim(0, 1) + ylim(0, 1) + 
-  theme_bw() + 
-  facet_grid(Size ~ Model)
-
+plot_fn <- function(n) {
+  if (n == 100) {
+    df <- df %>% filter(Size == 'n = 100')
+    title <- 'n = 100'
+  } else if (n == 500) {
+    df <- df %>% filter(Size == 'n = 500')
+    title <- 'n = 500'
+  } else if (n == 1000) {
+    df <- df %>% filter(Size == 'n = 1000')
+    title <- 'n = 1000'
+  }
+  ggplot(df, aes(EffSize, RejRate, group = VIM, color = VIM)) +
+    geom_point() + 
+    geom_line() + 
+    geom_hline(yintercept = 0.05, linetype = 'dashed') +
+    scale_y_continuous(breaks = c(0, .05, .25, .5, .75, 1), limits = c(0, 1)) + 
+    labs(x = 'Effect size', 
+         y = 'Rejection proportion') + 
+    theme_bw() + 
+    theme(legend.position = 'bottom') + 
+    scale_color_manual(name = 'CI Test',
+                       breaks = unique(df$VIM),
+                       labels = lbls,
+                       values = pal_npg()(5)) +
+    facet_grid(Simulation ~ Model)
+}
 
 
