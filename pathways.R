@@ -1,5 +1,8 @@
+# Set working directory
+setwd('~/Documents/DPhil/Chapters/CPI')
+
 # Set seed
-set.seed(123)
+set.seed(123, kind = "L'Ecuyer-CMRG")
 
 # Load libraries, register cores
 library(data.table)
@@ -10,7 +13,7 @@ library(ranger)
 library(stringr)
 library(tidyverse)
 library(doMC)
-registerDoMC(12)
+registerDoMC(8)
 
 # Import breast cancer data from Herschkowitz et al., 2007
 # (This is the data used by Wu & Smyth)
@@ -50,13 +53,15 @@ c2 <- c2[keep]
 n <- ncol(mat)
 p <- nrow(mat)
 df <- data.frame(t(mat), y = clin$Basal)
-rf <- ranger(data = df, dependent.variable.name = 'y', num.trees = 1e4,
-             keep.inbag = TRUE, classification = TRUE)
+rf <- ranger(data = df, dependent.variable.name = 'y', 
+             num.trees = 1e4, mtry = floor(p / 3),
+             keep.inbag = TRUE, classification = TRUE,
+             num.threads = 4)
 
 # Cross entropy loss function
 loss_fn <- function(mod, dat) {
   oob_idx <- ifelse(simplify2array(mod$inbag.counts) == 0, TRUE, NA)
-  preds <- predict(mod, dat, predict.all = TRUE)$predictions
+  preds <- predict(mod, dat, predict.all = TRUE, num.threads = 1)$predictions
   y_hat <- rowMeans(oob_idx * preds, na.rm = TRUE)
   loss <- -(df$y * log(y_hat) + (1 - df$y) * log(1 - y_hat))
   return(loss)
@@ -74,8 +79,10 @@ cpi <- function(pway) {
   x_r <- t(mat[other_genes, ])
   # Build null model
   df0 <- data.frame(x_s, x_r, y = clin$Basal)
-  rf0 <- ranger(data = df0, dependent.variable.name = 'y', num.trees = 1e4,
-                keep.inbag = TRUE, classification = TRUE)
+  rf0 <- ranger(data = df0, dependent.variable.name = 'y', 
+                num.trees = 1e4, mtry = floor(p / 3),
+                keep.inbag = TRUE, classification = TRUE,
+                num.threads = 1)
   # Test CPI
   loss0 <- loss_fn(rf0, df0)
   lambda <- log(loss0 / loss)
