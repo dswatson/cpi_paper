@@ -1,2 +1,2 @@
 # cpi
-Experiments in conditional predictive impact for random forests
+Scripts for reproducing analyses and figures for Watson & Wright's "Testing Conditional Independence in Supervised Learning Algorithms".
