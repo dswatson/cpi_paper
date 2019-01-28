@@ -2,8 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
-cpi.Rproj
-junk/
-ranger/
-temp/
-registries
+cpi_paper.Rproj
+attic/
+Figures/
