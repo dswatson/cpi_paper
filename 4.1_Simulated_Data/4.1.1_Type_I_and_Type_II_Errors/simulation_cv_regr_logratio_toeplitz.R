@@ -5,8 +5,8 @@ library(ggplot2)
 library(ggsci)
 
 # Simulation parameters ----------------------------------------------------------------
-num_replicates <- 10#10000
-n <- 100#1000
+num_replicates <- 10000
+n <- 1000
 p <- 10
 cov_base <- .9 # Toeplitz with base .9 covariance
 
@@ -139,7 +139,7 @@ lapply(unique(res$measure), function(m) {
   p <- plot_grid(plots_cpi[[m]], plots_tstat[[m]], plots_power[[m]], 
                  labels = "AUTO", ncol = 1)
   ggplot2::ggsave(paste0(reg_name, "_", m, ".pdf"), plot = p, width = 10, height = 13)
-  ggplot2::ggsave(paste0(reg_name, "_", m, ".png"), plot = p, width = 10, height = 13, dpi = 300)
+  #ggplot2::ggsave(paste0(reg_name, "_", m, ".png"), plot = p, width = 10, height = 13, dpi = 300)
 })
 
 # Coverage probabilities of confidence intervals
