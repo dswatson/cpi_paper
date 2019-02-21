@@ -5,9 +5,10 @@ library(ggplot2)
 library(ggsci)
 
 # Simulation parameters ----------------------------------------------------------------
-num_replicates <- 10000
-n <- 1000
+num_replicates <- 10#10000
+n <- 100#1000
 p <- 10
+cov_base <- .9 # Toeplitz with base .9 covariance
 
 # Algorithm parameters ----------------------------------------------------------------
 learners <- c("classif.logreg", "classif.ranger", "classif.nnet", "classif.svm")
@@ -15,13 +16,13 @@ tests <- c("t", "fisher")
 measures <- c("mmce", "logloss")
 
 # Registry ----------------------------------------------------------------
-reg_name <- "cpi_sim_cv_classif_logratio"
+reg_name <- "simulation_cv_classif_logratio_toeplitz"
 reg_dir <- file.path("registries", reg_name)
 dir.create("registries", showWarnings = FALSE)
 unlink(reg_dir, recursive = TRUE)
 makeExperimentRegistry(file.dir = reg_dir, 
-                       packages = "mlr", 
-                       source = c("../cpi_mlr.R", "problems.R"))
+                       packages = c("mlr", "cpi", "mvtnorm"),
+                       source = c("problems.R"))
 
 # Problems ----------------------------------------------------------------
 addProblem(name = "linear", fun = linear_data)
@@ -34,15 +35,17 @@ cpi <- function(data, job, instance, learner_name, ...) {
                      classif.nnet = list(size = 20, decay = .1, trace = FALSE), 
                      classif.svm = list(kernel = "radial"), 
                      list())
-  as.list(brute_force_mlr(task = instance, learner = makeLearner(learner_name, par.vals = par.vals, predict.type = "prob"), 
+  as.list(cpi(task = instance, learner = makeLearner(learner_name, par.vals = par.vals, predict.type = "prob"), 
                           resampling = makeResampleDesc("CV", iters = 5), ...))
 }
 addAlgorithm(name = "cpi", fun = cpi)
 
 # Experiments -----------------------------------------------------------
 prob_design <- list(linear = expand.grid(n = n, p = p, outcome = "classif",
+                                         cov_base = cov_base,
                                          stringsAsFactors = FALSE), 
                     nonlinear = expand.grid(n = n, p = p, outcome = "classif",
+                                            cov_base = cov_base,
                                             stringsAsFactors = FALSE))
 algo_design <- list(cpi = expand.grid(learner_name = learners,
                                       test = tests,
@@ -69,8 +72,8 @@ waitForJobs()
 
 # Get results -------------------------------------------------------------
 res_wide <- flatten(flatten(ijoin(reduceResultsDataTable(), getJobPars())))
-res <- melt(res_wide, measure.vars = patterns("^Variable*", "^CPI*", "^SE*", "^statistic*", "^p.value*", "^ci_low*"), 
-            value.name = c("Variable", "CPI", "SE", "Statistic", "p.value", "CI_low"))
+res <- melt(res_wide, measure.vars = patterns("^Variable*", "^CPI*", "^SE*", "^statistic*", "^p.value*", "^ci.low*"), 
+            value.name = c("Variable", "CPI", "SE", "Statistic", "p.value", "ci.low"))
 res[, Variable := factor(Variable,
                          levels = paste0("x", 1:unique(p)), 
                          labels = paste0("X", 1:unique(p)))]
@@ -80,10 +83,10 @@ res[, Learner := factor(learner_name,
 res[, Problem := factor(problem, 
                 levels = c("linear", "nonlinear"), 
                 labels = c("Linear data", "Nonlinear data"))]
-saveRDS(res, "simulation_cv_classif_logratio.Rds")
+saveRDS(res, paste0(reg_name, ".Rds"))
 
 # Plots -------------------------------------------------------------
-res <- readRDS("simulation_cv_classif_logratio.Rds")
+res <- readRDS(paste0(reg_name, ".Rds"))
 
 res[, Problem := factor(problem, 
                         levels = c("linear", "nonlinear"), 
@@ -135,13 +138,13 @@ library(cowplot)
 lapply(unique(res$measure), function(m) {
   p <- plot_grid(plots_cpi[[m]], plots_tstat[[m]], plots_power[[m]], 
                  labels = "AUTO", ncol = 1)
-  ggplot2::ggsave(paste0("cv_classif_logratio_", m, ".pdf"), plot = p, width = 10, height = 13)
-  ggplot2::ggsave(paste0("cv_classif_logratio_", m, ".png"), plot = p, width = 10, height = 13, dpi = 300)
+  ggplot2::ggsave(paste0(reg_name, "_", m, ".pdf"), plot = p, width = 10, height = 13)
+  ggplot2::ggsave(paste0(reg_name, "_", m, ".png"), plot = p, width = 10, height = 13, dpi = 300)
 })
 
 # Coverage probabilities of confidence intervals
 library(xtable)
-tab <- res[Variable %in% c("X1", "X2"), mean(CI_low < 0), by = list(measure, test, Learner, Problem)]
+tab <- res[Variable %in% c("X1", "X2"), mean(ci.low < 0), by = list(measure, test, Learner, Problem)]
 invisible(lapply(unique(res$measure), function(m) {
   tab_m <- dcast(tab[measure == m, ], Learner ~ Problem + test, value.var = "V1")
   print(xtable(tab_m, digits = 4, caption = paste("Classif logratio", m)), booktabs = TRUE, table.placement = "htbp",

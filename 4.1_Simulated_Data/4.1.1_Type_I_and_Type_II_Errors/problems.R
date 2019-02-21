@@ -1,10 +1,12 @@
 
 # Linear data ----------------------------------------------------------------
-linear_data <- function(data, job, n, p, outcome = "regr", ...) {
+linear_data <- function(data, job, n, p, outcome = "regr", cov_base = 0, ...) {
   beta <- rep(c(0, 0, -.5, .5, -1, 1, -1.5, 1.5, -2, 2), each = p/10)
   beta0 <- 0
   
-  x <- matrix(runif(n * p), ncol = p,
+  sigma <- toeplitz(cov_base^(0:(p-1)))
+  
+  x <- matrix(rmvnorm(n = n, sigma = sigma), ncol = p,
               dimnames = list(NULL, paste0('x', seq_len(p))))
   lp <- x %*% beta + beta0 
   
@@ -20,13 +22,15 @@ linear_data <- function(data, job, n, p, outcome = "regr", ...) {
 }
 
 # Non-linear data ----------------------------------------------------------------
-nonlinear_data <- function(data, job, n, p, outcome = "regr", ...) {
+nonlinear_data <- function(data, job, n, p, outcome = "regr", cov_base = 0, ...) {
   beta <- rep(c(0, 0, -.5, .5, -1, 1, -1.5, 1.5, -2, 2), each = p/10)
   beta0 <- 0
   
-  x <- matrix(runif(n * p), ncol = p,
+  sigma <- toeplitz(cov_base^(0:(p-1)))
+  
+  x <- matrix(rmvnorm(n = n, sigma = sigma), ncol = p,
               dimnames = list(NULL, paste0('x', seq_len(p))))
-  idx <- x < .25 | x > .75
+  idx <- x < -qnorm(0.75) | x > qnorm(0.75)
   xx <- matrix(0, nrow = n, ncol = p)
   xx[idx] <- 0
   xx[!idx] <- 1
