@@ -1,5 +1,5 @@
 # Set working directory
-setwd('~/Documents/DPhil/Chapters/CPI')
+setwd('~/Documents/CPI/cpi_paper/4.2_Real_Data/4.2.2_Breast_Cancer')
 
 # Set seed
 set.seed(123, kind = "L'Ecuyer-CMRG")
