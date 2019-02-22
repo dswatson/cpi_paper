@@ -3,6 +3,7 @@ library(data.table)
 library(ranger)
 library(nnet)
 library(e1071)
+library(mvtnorm)
 library(vimp)
 library(ggsci)
 library(tidyverse)
@@ -53,16 +54,17 @@ compute_loss <- function(trn, tst) {
   
 }
 
-loop <- function(b, sim, test_n) {
+loop <- function(b, cov_base, sim, test_n) {
   
   # Simulate data
   beta <- c(0, 0, -0.5, 0.5, -1, 1, -1.5, 1.5, -2, 2)
-  x <- matrix(runif(3 * test_n * p), ncol = p,
+  sigma <- toeplitz(cov_base^(0:(p - 1)))
+  x <- matrix(rmvnorm(3 * test_n, sigma = sigma), ncol = p,
               dimnames = list(NULL, paste0('x', seq_len(p))))
   if (sim == 'linear') {
     y <- x %*% beta + rnorm(3 * test_n)
   } else if (sim == 'nonlinear') {
-    idx <- x < .25 | x > .75
+    idx <- x < -qnorm(0.75) | x > qnorm(0.75)
     xx <- matrix(0, nrow = 3 * test_n, ncol = p)
     xx[idx] <- 0
     xx[!idx] <- 1
@@ -77,7 +79,7 @@ loop <- function(b, sim, test_n) {
   
   # Fit and evaluate original models
   orig <- compute_loss(train, test)
-  
+
   ### CPI ###
   cpi_fn <- function(j) {
     dat0[, j] <- dat[sample.int(3 * test_n), j]
@@ -229,6 +231,7 @@ loop <- function(b, sim, test_n) {
 
 # Execute in parallel
 out <- foreach(b = seq_len(1e4), .combine = rbind) %:%
+  foreach(cov_base = c(0, 0.9)) %:%
   foreach(sim = c('linear', 'nonlinear'), .combine = rbind) %:%
   foreach(test_n = c(50, 250, 500), .combine = rbind) %dopar% 
   loop(b, sim, test_n)
