@@ -2,22 +2,24 @@ library(ggplot2)
 library(ggsci)
 library(mlr)
 library(data.table)
-
-source("../cpi_mlr.R")
+library(cpi)
 
 seed <- 100
 
+# Drop categorical feature
+task <- dropFeatures(bh.task, "chas")
+
 # Linear model
 set.seed(seed)
-cpi_lm_log <- brute_force_mlr(task = bh.task, learner = makeLearner("regr.lm"), 
-                              resampling = makeResampleDesc("Subsample", iters = 20), 
-                              test = "t", measure = mse, log = TRUE)
+cpi_lm_log <- cpi(task = task, learner = makeLearner("regr.lm"), 
+                  resampling = makeResampleDesc("Subsample", iters = 20), 
+                  test = "t", measure = mse, log = FALSE)
 
 # SVM
 set.seed(seed)
-cpi_svm_log <- brute_force_mlr(task = bh.task, learner = makeLearner("regr.svm", kernel = "radial"), 
-                               resampling = makeResampleDesc("Subsample", iters = 20), 
-                               test = "t", measure = mse, log = TRUE)
+cpi_svm_log <- cpi(task = task, learner = makeLearner("regr.svm", kernel = "radial"), 
+                   resampling = makeResampleDesc("Subsample", iters = 20), 
+                   test = "t", measure = mse, log = FALSE)
 
 # Combine for plotting
 res <- rbind(data.table(Learner = "Linear model", Log = "Multiplicative CPI", cpi_lm_log[, c("Variable", "CPI", "SE", "p.value")]),
