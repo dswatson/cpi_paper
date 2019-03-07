@@ -9,6 +9,7 @@ library(data.table)
 library(GEOquery)
 library(limma)
 library(qusage)
+library(knockoff)
 library(ranger)
 library(stringr)
 library(tidyverse)
@@ -27,7 +28,7 @@ clin <- pData(eset)
 
 # Add basal column
 clin <- clin %>%
-  mutate(Basal = ifelse(grepl('Basal', characteristics_ch2.11), 1, 0))
+  mutate(Basal = if_else(grepl('Basal', characteristics_ch2.11), 1, 0))
 
 # Reduce matrix to gene symbols, remove NAs
 mat <- avereps(mat, ID = fData(eset)$GENE_SYMBOL)
@@ -56,11 +57,13 @@ df <- data.frame(t(mat), y = clin$Basal)
 rf <- ranger(data = df, dependent.variable.name = 'y', 
              num.trees = 1e4, mtry = floor(p / 3),
              keep.inbag = TRUE, classification = TRUE,
-             num.threads = 4)
+             num.threads = 8)
+
+# Record OOB index
+oob_idx <- ifelse(simplify2array(rf$inbag.counts) == 0, TRUE, NA)
 
 # Cross entropy loss function
 loss_fn <- function(mod, dat) {
-  oob_idx <- ifelse(simplify2array(mod$inbag.counts) == 0, TRUE, NA)
   preds <- predict(mod, dat, predict.all = TRUE, num.threads = 1)$predictions
   y_hat <- rowMeans(oob_idx * preds, na.rm = TRUE)
   loss <- -(df$y * log(y_hat) + (1 - df$y) * log(1 - y_hat))
@@ -68,31 +71,29 @@ loss_fn <- function(mod, dat) {
 }
 loss <- loss_fn(rf, df)
 
+# Create knockoff matrix
+x_tilde <- create.second_order(t(mat), shrink = TRUE)
+
 # CPI function
 cpi <- function(pway) {
   # Permute submatrix of interest
   genes <- c2[[pway]]
-  x_s <- t(mat[genes, ])
-  x_s <- x_s[sample.int(n), ]
+  x_s <- x_tilde[, genes]
   # Condition on remaining genes
   other_genes <- setdiff(rownames(mat), genes)
   x_r <- t(mat[other_genes, ])
-  # Build null model
+  # Compute null loss
   df0 <- data.frame(x_s, x_r, y = clin$Basal)
-  rf0 <- ranger(data = df0, dependent.variable.name = 'y', 
-                num.trees = 1e4, mtry = floor(p / 3),
-                keep.inbag = TRUE, classification = TRUE,
-                num.threads = 1)
+  loss0 <- loss_fn(rf, df0)
   # Test CPI
-  loss0 <- loss_fn(rf0, df0)
-  lambda <- log(loss0 / loss)
-  t_test <- t.test(lambda, alternative = 'greater')
+  delta <- loss0 - loss
+  t_test <- t.test(delta, alternative = 'greater')
   # Export results
   out <- data.table(
     GeneSet = pway,
     N_Genes = length(genes),
-        CPI = mean(lambda),
-         SE = sd(lambda) / sqrt(n),
+        CPI = mean(delta),
+         SE = sd(delta) / sqrt(n),
           t = t_test$statistic,
     p.value = t_test$p.value
   )
@@ -100,11 +101,11 @@ cpi <- function(pway) {
 }
 
 # Execute in parallel
-res <- foreach(p = names(c2), .combine = rbind) %dopar% cpi(p) 
+res <- foreach(pway = names(c2), .combine = rbind) %dopar% cpi(pway) 
 res <- res %>%
   arrange(p.value) %>%
   mutate(q.value = p.adjust(p.value, method = 'fdr'))
-fwrite(res, 'GeneSets_lambda.csv')
+fwrite(res, 'BreastCancer_CPI_res.csv')
 
 # Plot results
 df <- res %>% 
