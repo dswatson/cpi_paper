@@ -1,7 +1,7 @@
 
 # Linear data ----------------------------------------------------------------
 linear_data <- function(data, job, n, p, outcome = "regr", cov_base = 0, ...) {
-  beta <- rep(seq(0, .9, length.out = 10), each = p/10)
+  beta <- rep(c(0, 0, -.5, .5, -1, 1, -1.5, 1.5, -2, 2), each = p/10)
   beta0 <- 0
   
   sigma <- toeplitz(cov_base^(0:(p-1)))
@@ -23,7 +23,7 @@ linear_data <- function(data, job, n, p, outcome = "regr", cov_base = 0, ...) {
 
 # Non-linear data ----------------------------------------------------------------
 nonlinear_data <- function(data, job, n, p, outcome = "regr", cov_base = 0, ...) {
-  beta <- rep(seq(0, .9, length.out = 10), each = p/10)
+  beta <- rep(c(0, 0, -.5, .5, -1, 1, -1.5, 1.5, -2, 2), each = p/10)
   beta0 <- 0
   
   sigma <- toeplitz(cov_base^(0:(p-1)))
@@ -32,7 +32,7 @@ nonlinear_data <- function(data, job, n, p, outcome = "regr", cov_base = 0, ...)
               dimnames = list(NULL, paste0('x', seq_len(p))))
   idx <- x < -qnorm(0.75) | x > qnorm(0.75)
   xx <- matrix(0, nrow = n, ncol = p)
-  xx[idx] <- -1
+  xx[idx] <- 0
   xx[!idx] <- 1
   lp <- xx %*% beta + beta0
   
