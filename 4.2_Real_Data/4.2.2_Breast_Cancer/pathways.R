@@ -9,6 +9,7 @@ library(data.table)
 library(GEOquery)
 library(limma)
 library(qusage)
+library(corpcor)
 library(knockoff)
 library(ranger)
 library(stringr)
@@ -72,7 +73,9 @@ loss_fn <- function(mod, dat) {
 loss <- loss_fn(rf, df)
 
 # Create knockoff matrix
-x_tilde <- create.second_order(t(mat), shrink = TRUE)
+mu <- rep(0, p)
+Sigma <- matrix(cov.shrink(t(mat), verbose = FALSE), nrow = p)
+x_tilde <- create.gaussian(t(mat), mu, Sigma, method = 'asdp')
 
 # CPI function
 cpi <- function(pway) {
