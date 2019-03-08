@@ -76,7 +76,7 @@ x_tilde <- create.second_order(t(mat), shrink = TRUE)
 
 # CPI function
 cpi <- function(pway) {
-  # Permute submatrix of interest
+  # Replace submatrix of interest
   genes <- c2[[pway]]
   x_s <- x_tilde[, genes]
   # Condition on remaining genes
@@ -107,37 +107,7 @@ res <- res %>%
   mutate(q.value = p.adjust(p.value, method = 'fdr'))
 fwrite(res, 'BreastCancer_CPI_res.csv')
 
-# Plot results
-df <- res %>% 
-  filter(q.value <= 0.01) %>%
-  arrange(CPI) %>%
-  mutate(GeneSet = str_to_title(tolower(GeneSet)),
-         GeneSet = gsub('esrra', 'ESRRA', GeneSet),
-         GeneSet = gsub('esr', 'ESR', GeneSet),
-         GeneSet = gsub('nipp', 'NIPP', GeneSet),
-         GeneSet = gsub('tp', 'TP', GeneSet),
-         GeneSet = gsub('alz', 'Alz', GeneSet),
-         GeneSet = gsub('rhoa', 'RHOA', GeneSet),
-         GeneSet = gsub('pax3foxo1', 'PAX3-FOXO1', GeneSet),
-         GeneSet = gsub('mycn', 'MYCN', GeneSet),
-         GeneSet = gsub('neck_cancer_d', 'neck_cancer_dn', GeneSet),
-         GeneSet = gsub('tads', 'TADs', GeneSet),
-         GeneSet = gsub('e_box', 'E-box', GeneSet),
-         GeneSet = gsub('hcp', 'HCP', GeneSet),
-         GeneSet = gsub('h3k4me3', 'H3K4me3', GeneSet),
-         GeneSet = gsub('h3k27me3', 'H3K27me3', GeneSet),
-         GeneSet = gsub('klf1', 'KLF1', GeneSet),
-         GeneSet = gsub('ezh2', 'EZH2', GeneSet),
-         GeneSet = gsub('ewsr1', 'EWSR1', GeneSet),
-         GeneSet = gsub('flii', 'FLII', GeneSet),
-         GeneSet = gsub('luminal_b', 'luminal_B', GeneSet),
-         GeneSet = factor(GeneSet, levels = unique(GeneSet)))
-ggplot(df, aes(GeneSet, CPI)) + 
-  geom_col() + 
-  geom_errorbar(aes(ymin = CPI - SE, ymax = CPI + SE)) + 
-  coord_flip() + 
-  labs(x = '', y = expression('CPI'[lambda])) +
-  theme_bw() 
+
 
 
 
