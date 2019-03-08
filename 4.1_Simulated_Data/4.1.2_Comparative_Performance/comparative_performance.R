@@ -4,7 +4,6 @@ library(knockoff)
 library(ranger)
 library(nnet)
 library(e1071)
-library(mvtnorm)
 library(vimp)
 library(ggsci)
 library(tidyverse)
@@ -45,7 +44,7 @@ loop <- function(b, rho, sim, test_n) {
   
   # Fit models
   lm_fit <- lm(y ~ ., data = train)
-  rf_fit <- ranger(y ~ ., data = train)
+  rf_fit <- ranger(y ~ ., data = train, num.trees = 50)
   nn_fit <- nnet(y ~ ., data = train, size = 20, decay = 0.1, 
                  linout = TRUE, trace = FALSE)
   svm_fit <- svm(y ~ ., data = train, kernel = 'radial', fitted = FALSE)
