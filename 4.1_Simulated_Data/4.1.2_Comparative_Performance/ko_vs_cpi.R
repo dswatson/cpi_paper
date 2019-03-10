@@ -12,7 +12,7 @@ library(doMC)
 registerDoMC(8)
 
 # Outer loop
-loop <- function(n = 3000, p, rho, amplitude) {
+outer_loop <- function(n = 3000, p, rho, amplitude) {
   # Simulate predictors
   x <- matrix(rnorm(n * p), ncol = p)
   if (rho == 0) {
@@ -32,7 +32,7 @@ loop <- function(n = 3000, p, rho, amplitude) {
   mu <- rep(0, p)
   diag_s = create.solve_asdp(Sigma)
   # Inner loop
-  test <- function(b, type) {
+  inner_loop <- function(b, type) {
     # Generate knockoffs
     x_tilde <- create.gaussian(x, mu, Sigma, diag_s = diag_s)
     ### Knockoff filter ###
@@ -101,7 +101,7 @@ loop <- function(n = 3000, p, rho, amplitude) {
   # Execute inner loop in parallel
   out <- foreach(b = seq_len(200), .combine = rbind) %:%
     foreach(type = c('regression', 'classification'), .combine = rbind) %dopar% 
-    test(b, type)
+    inner_loop(b, type)
   out[, p := p 
     ][, rho := rho
     ][, amplitude := amplitude]
@@ -111,12 +111,12 @@ loop <- function(n = 3000, p, rho, amplitude) {
 # Execute outer loop in serial, export to RDS
 out <- foreach(p = c(1000, 6000), .combine = rbind) %:%
   foreach(rho = seq(from = 0, to = 0.8, by = 0.1), .combine = rbind) %do%
-  loop(n = 3000, p = p, rho = rho, amplitude = 10)
+  outer_loop(n = 3000, p = p, rho = rho, amplitude = 10)
 saveRDS(out, 'out_rho.rds')
 rm(out)
 out <- foreach(p = c(1000, 6000), .combine = rbind) %:%
   foreach(amplitude = seq(from = 5, to = 13, by = 1), .combine = rbind) %do%
-  loop(n = 3000, p = p, rho = 0, amplitude = amplitude)
+  outer_loop(n = 3000, p = p, rho = 0, amplitude = amplitude)
 saveRDS(out, 'out_amp.rds')
 
 
