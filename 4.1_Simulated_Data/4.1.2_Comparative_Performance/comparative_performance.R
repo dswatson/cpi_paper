@@ -7,7 +7,7 @@ library(ggsci)
 set.seed(42)
 
 # Simulation parameters ----------------------------------------------------------------
-num_replicates <- 1000 #10000
+num_replicates <- 10000
 n <- c(100, 500, 1000)
 p <- 10
 type <- c("linear", "nonlinear")
@@ -50,12 +50,6 @@ algo_design <- list(cpi = expand.grid(learner_name = learners,
 addExperiments(prob_design, algo_design, repls = num_replicates)
 summarizeExperiments()
 #testJob(1)
-
-# aa <- testJob(1)
-# bb <- testJob(113)
-# cc <- testJob(227)
-# dd <- testJob(339)
-#testJob(6400)
 
 # Submit -----------------------------------------------------------
 if (grepl("node\\d{2}|bipscluster", system("hostname", intern = TRUE))) {
