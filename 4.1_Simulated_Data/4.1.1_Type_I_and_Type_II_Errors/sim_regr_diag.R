@@ -33,7 +33,7 @@ addProblem(name = "nonlinear", fun = nonlinear_data, seed = 44)
 # Algorithms ----------------------------------------------------------------
 cpi <- function(data, job, instance, learner_name, ...) {
   par.vals <- switch(learner_name, 
-                     regr.ranger = list(num.trees = 50), 
+                     regr.ranger = list(num.trees = 500), 
                      regr.nnet = list(size = 20, decay = .1, trace = FALSE), 
                      regr.svm = list(kernel = "radial"), 
                      list())
