@@ -6,7 +6,6 @@ set.seed(123, kind = "L'Ecuyer-CMRG")
 
 # Load libraries, register cores
 library(data.table)
-library(GEOquery)
 library(limma)
 library(qusage)
 library(corpcor)
@@ -17,28 +16,12 @@ library(tidyverse)
 library(doMC)
 registerDoMC(8)
 
-# Import breast cancer data from Herschkowitz et al., 2007
-# (This is the data used by Wu & Smyth)
-eset <- getGEO('GSE3165')[[3]]
-
-# Extract expression data
-mat <- exprs(eset)
-
-# Phenotype data
-clin <- pData(eset)
-
-# Add basal column
-clin <- clin %>%
-  mutate(Basal = if_else(grepl('Basal', characteristics_ch2.11), 1, 0))
-
-# Reduce matrix to gene symbols, remove NAs
-mat <- avereps(mat, ID = fData(eset)$GENE_SYMBOL)
-mat <- mat[rownames(mat) != '', ]
-mat <- na.omit(mat)
+# Import gene expression data
+dat <- readRDS('GSE165.rds')
 
 # C2 gene sets
 c2 <- read.gmt('c2.all.v6.2.symbols.gmt')
-tmp1 <- data.table(GeneSymbol = rownames(mat))
+tmp1 <- data.table(GeneSymbol = colnames(x))
 tmp2 <- seq_along(c2) %>%
   map_df(~ data.table(Pathway = names(c2)[.x],
                    GeneSymbol = unlist(c2[[.x]])) %>%
@@ -52,9 +35,9 @@ keep <- pway_size >= 25
 c2 <- c2[keep]
 
 # Build original model
-n <- ncol(mat)
-p <- nrow(mat)
-df <- data.frame(t(mat), y = clin$Basal)
+n <- nrow(dat$x)
+p <- ncol(dat$x)
+df <- data.frame(dat$x, y = dat$y)
 rf <- ranger(data = df, dependent.variable.name = 'y', 
              num.trees = 1e4, mtry = floor(p / 3),
              keep.inbag = TRUE, classification = TRUE,
@@ -74,8 +57,8 @@ loss <- loss_fn(rf, df)
 
 # Create knockoff matrix
 mu <- rep(0, p)
-Sigma <- matrix(cov.shrink(t(mat), verbose = FALSE), nrow = p)
-x_tilde <- create.gaussian(t(mat), mu, Sigma, method = 'asdp')
+Sigma <- matrix(cov.shrink(x, verbose = FALSE), nrow = p)
+x_tilde <- create.gaussian(x, mu, Sigma, method = 'asdp')
 
 # CPI function
 cpi <- function(pway) {
@@ -83,8 +66,8 @@ cpi <- function(pway) {
   genes <- c2[[pway]]
   x_s <- x_tilde[, genes]
   # Condition on remaining genes
-  other_genes <- setdiff(rownames(mat), genes)
-  x_r <- t(mat[other_genes, ])
+  other_genes <- setdiff(colnames(x), genes)
+  x_r <- x[, other_genes]
   # Compute null loss
   df0 <- data.frame(x_s, x_r, y = clin$Basal)
   loss0 <- loss_fn(rf, df0)
