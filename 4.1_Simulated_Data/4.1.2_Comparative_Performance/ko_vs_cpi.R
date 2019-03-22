@@ -2,6 +2,7 @@
 library(data.table)
 library(batchtools)
 library(ggplot2)
+library(cowplot)
 library(ggsci)
 library(knockoff)
 library(glmnet)
@@ -9,7 +10,7 @@ library(glmnet)
 set.seed(42)
 
 # Simulation parameters ----------------------------------------------------------------
-num_replicates <- 200
+num_replicates <- 1000
 
 # Registry ----------------------------------------------------------------
 reg_name <- "ko_vs_cpi"
@@ -47,7 +48,7 @@ create_data <- function(data, job, n, p, type, rho, amplitude) {
   x_tilde <- create.gaussian(x, mu, Sigma, diag_s = diag_s)
   
   # Generate test dataset
-  x_test <- matrix(rnorm(n * p, ), ncol = p)
+  x_test <- matrix(rnorm(n * p), ncol = p)
   if (rho > 0) {
     x_test <- x_test %*% chol(Sigma)
   }
@@ -114,8 +115,7 @@ cpi <- function(data, job, instance) {
     y_hat <- predict(f, newx = x_test, s = 'lambda.min')
     loss <- (y_test - y_hat)^2
   }
-  #p_values <- rep(1, p)
-  p_values <- runif(p)
+  p_values <- rep(NA, p)
   cpi_fn <- function(j) {
     x_test[, j] <- x_tilde[, j]
     if (is.factor(y)) {
@@ -183,35 +183,58 @@ saveRDS(res, paste0(reg_name, ".Rds"))
 
 # Plot results -------------------------------------------------------------
 res <- readRDS(paste0(reg_name, ".Rds"))
+res[, Method := factor(algorithm, levels = c("cpi", "knockoff_filter"), 
+                       labels = c("CPI", "Knockoff filter"))]
 
 # Mean over replications
-res[, Power := mean(reject, na.rm = TRUE), by = list(algorithm, n, p, type, rho, amplitude, variable)]
+res[, Power := mean(reject, na.rm = TRUE), by = list(Method, n, p, type, rho, amplitude, variable)]
 
 # Mean over variables
-res[, Power := mean(Power, na.rm = TRUE), by = list(algorithm, n, p, type, rho, amplitude)]
-res[, FDR := mean(FDR, na.rm = TRUE), by = list(algorithm, n, p, type, rho, amplitude)]
+res[, Power := mean(Power, na.rm = TRUE), by = list(Method, n, p, type, rho, amplitude)]
+res[, FDR := mean(FDR, na.rm = TRUE), by = list(Method, n, p, type, rho, amplitude)]
 
 # Fig.1 from Candès et al. - Power
-ggplot(res[type == "regression" & amplitude == 10 & p == 1000 & n == 300, ], aes(x = rho, y = Power, col = algorithm)) + 
+p_rho_power <- ggplot(res[type == "regression" & amplitude == 10 & p == 1000 & n == 300, ], aes(x = rho, y = Power, col = Method)) + 
   geom_line() + 
-  ylim(0, 1)
-ggplot2::ggsave(paste0(reg_name, "_power_rho.pdf"), width = 10, height = 5)
+  ylim(0, 1) + 
+  theme_bw() + 
+  scale_color_npg()
+#ggplot2::ggsave(paste0(reg_name, "_power_rho.pdf"), width = 10, height = 5)
 
 # Fig.1 from Candès et al. - FDR
-ggplot(res[type == "regression" & amplitude == 10 & p == 1000 & n == 300, ], aes(x = rho, y = FDR, col = algorithm)) + 
+p_rho_fdr <- ggplot(res[type == "regression" & amplitude == 10 & p == 1000 & n == 300, ], aes(x = rho, y = FDR, col = Method)) + 
   geom_line() + 
-  ylim(0, 1)
-ggplot2::ggsave(paste0(reg_name, "_fdr_rho.pdf"), width = 10, height = 5)
+  ylim(0, 1) + 
+  theme_bw() + 
+  scale_color_npg()
+#ggplot2::ggsave(paste0(reg_name, "_fdr_rho.pdf"), width = 10, height = 5)
+
+# Plot together
+plot_grid(p_rho_power + theme(legend.position = "none"), 
+          get_legend(p_rho_power),
+          p_rho_fdr + theme(legend.position = "none"), 
+          nrow = 1, rel_widths = c(.4, .1, .4))
+ggplot2::ggsave(paste0(reg_name, "_rho.pdf"), width = 15, height = 5)
 
 # Fig.2 from Candès et al. - Power
-ggplot(res[type == "regression" & rho == 0 & p == 1000 & n == 300, ], aes(x = amplitude, y = Power, col = algorithm)) + 
+p_ampl_power <- ggplot(res[type == "regression" & rho == 0 & p == 1000 & n == 300, ], aes(x = amplitude, y = Power, col = Method)) + 
   geom_line() + 
-  ylim(0, 1)
-ggplot2::ggsave(paste0(reg_name, "_power_ampl.pdf"), width = 10, height = 5)
+  ylim(0, 1) + 
+  theme_bw() + 
+  scale_color_npg()
+#ggplot2::ggsave(paste0(reg_name, "_power_ampl.pdf"), width = 10, height = 5)
 
 # Fig.2 from Candès et al. - FDR
-ggplot(res[type == "regression" & rho == 0 & p == 1000 & n == 300, ], aes(x = amplitude, y = FDR, col = algorithm)) + 
+p_ampl_fdr <- ggplot(res[type == "regression" & rho == 0 & p == 1000 & n == 300, ], aes(x = amplitude, y = FDR, col = Method)) + 
   geom_line() + 
-  ylim(0, 1)
-ggplot2::ggsave(paste0(reg_name, "_fdr_ampl.pdf"), width = 10, height = 5)
+  ylim(0, 1) + 
+  theme_bw() + 
+  scale_color_npg()
+#ggplot2::ggsave(paste0(reg_name, "_fdr_ampl.pdf"), width = 10, height = 5)
 
+# Plot together
+plot_grid(p_ampl_power + theme(legend.position = "none"), 
+          get_legend(p_ampl_power),
+          p_ampl_fdr + theme(legend.position = "none"), 
+          nrow = 1, rel_widths = c(.4, .1, .4))
+ggplot2::ggsave(paste0(reg_name, "_ampl.pdf"), width = 15, height = 5)
