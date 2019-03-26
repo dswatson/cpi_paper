@@ -203,6 +203,7 @@ p_rho_power <- ggplot(res[type == "regression" & amplitude == 10 & p == 1000 & n
 
 # Fig.1 from Candès et al. - FDR
 p_rho_fdr <- ggplot(res[type == "regression" & amplitude == 10 & p == 1000 & n == 300, ], aes(x = rho, y = FDR, col = Method)) + 
+  geom_hline(yintercept = 0.1, col = "black", linetype = "dashed") +
   geom_line() + 
   ylim(0, 1) + 
   theme_bw() + 
@@ -221,15 +222,18 @@ p_ampl_power <- ggplot(res[type == "regression" & rho == 0 & p == 1000 & n == 30
   geom_line() + 
   ylim(0, 1) + 
   theme_bw() + 
-  scale_color_npg()
+  scale_color_npg() + 
+  ylab("Amplitude")
 #ggplot2::ggsave(paste0(reg_name, "_power_ampl.pdf"), width = 10, height = 5)
 
 # Fig.2 from Candès et al. - FDR
 p_ampl_fdr <- ggplot(res[type == "regression" & rho == 0 & p == 1000 & n == 300, ], aes(x = amplitude, y = FDR, col = Method)) + 
+  geom_hline(yintercept = 0.1, col = "black", linetype = "dashed") +
   geom_line() + 
   ylim(0, 1) + 
   theme_bw() + 
-  scale_color_npg()
+  scale_color_npg() + 
+  ylab("Amplitude")
 #ggplot2::ggsave(paste0(reg_name, "_fdr_ampl.pdf"), width = 10, height = 5)
 
 # Plot together
