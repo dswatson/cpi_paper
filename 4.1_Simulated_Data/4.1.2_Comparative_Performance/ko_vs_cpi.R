@@ -198,7 +198,8 @@ p_rho_power <- ggplot(res[type == "regression" & amplitude == 10 & p == 1000 & n
   geom_line() + 
   ylim(0, 1) + 
   theme_bw() + 
-  scale_color_npg()
+  scale_color_npg() + 
+  xlab("Correlation coefficient")
 #ggplot2::ggsave(paste0(reg_name, "_power_rho.pdf"), width = 10, height = 5)
 
 # Fig.1 from Candès et al. - FDR
@@ -207,7 +208,8 @@ p_rho_fdr <- ggplot(res[type == "regression" & amplitude == 10 & p == 1000 & n =
   geom_line() + 
   ylim(0, 1) + 
   theme_bw() + 
-  scale_color_npg()
+  scale_color_npg() + 
+  xlab("Correlation coefficient")
 #ggplot2::ggsave(paste0(reg_name, "_fdr_rho.pdf"), width = 10, height = 5)
 
 # Plot together
@@ -223,7 +225,7 @@ p_ampl_power <- ggplot(res[type == "regression" & rho == 0 & p == 1000 & n == 30
   ylim(0, 1) + 
   theme_bw() + 
   scale_color_npg() + 
-  ylab("Amplitude")
+  xlab("Amplitude")
 #ggplot2::ggsave(paste0(reg_name, "_power_ampl.pdf"), width = 10, height = 5)
 
 # Fig.2 from Candès et al. - FDR
@@ -233,7 +235,7 @@ p_ampl_fdr <- ggplot(res[type == "regression" & rho == 0 & p == 1000 & n == 300,
   ylim(0, 1) + 
   theme_bw() + 
   scale_color_npg() + 
-  ylab("Amplitude")
+  xlab("Amplitude")
 #ggplot2::ggsave(paste0(reg_name, "_fdr_ampl.pdf"), width = 10, height = 5)
 
 # Plot together
