@@ -120,3 +120,13 @@ out <- foreach(p = c(1000, 6000), .combine = rbind) %:%
 saveRDS(out, 'out_amp.rds')
 
 
+
+
+
+
+
+
+
+
+
+
