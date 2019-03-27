@@ -6,8 +6,8 @@ library(cpi)
 
 seed <- 100
 
-# Drop categorical feature
-task <- dropFeatures(bh.task, "chas")
+# Convert 2-level factor to binary
+task <- createDummyFeatures(bh.task, method = "reference", cols = "chas")
 
 # Linear model
 set.seed(seed)
@@ -27,7 +27,9 @@ res <- rbind(data.table(Learner = "Linear model", Log = "Multiplicative CPI", cp
 res[, p.adj := p.adjust(p.value, "holm")]
 res[, signif := ifelse(p.adj <= .05, 1, 0)]
 levels <- res[Learner == "Support vector machine", as.character(Variable)[order(CPI)]]
-res[, Variable := factor(Variable, levels = levels)]
+labels <- levels
+labels[labels == "chas.1"] <- "chas"
+res[, Variable := factor(Variable, levels = levels, labels = labels)]
 
 # Plot
 ggplot(res, aes(x = Variable, fill = Learner, y = CPI, alpha = signif)) + 
