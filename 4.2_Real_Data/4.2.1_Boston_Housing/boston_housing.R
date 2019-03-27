@@ -12,13 +12,13 @@ task <- createDummyFeatures(bh.task, method = "reference", cols = "chas")
 # Linear model
 set.seed(seed)
 cpi_lm_log <- cpi(task = task, learner = makeLearner("regr.lm"), 
-                  resampling = makeResampleDesc("Subsample", iters = 20), 
+                  resampling = makeResampleDesc("Subsample", iters = 5), 
                   test = "t", measure = mse, log = FALSE)
 
 # SVM
 set.seed(seed)
 cpi_svm_log <- cpi(task = task, learner = makeLearner("regr.svm", kernel = "radial"), 
-                   resampling = makeResampleDesc("Subsample", iters = 20), 
+                   resampling = makeResampleDesc("Subsample", iters = 5), 
                    test = "t", measure = mse, log = FALSE)
 
 # Combine for plotting
