@@ -1,5 +1,5 @@
 # Set working directory
-setwd('~/Documents/CPI/cpi_paper/4.2_Real_Data/4.2.2_Breast_Cancer')
+#setwd('~/Documents/CPI/cpi_paper/4.2_Real_Data/4.2.2_Breast_Cancer')
 
 # Set seed
 set.seed(123, kind = "L'Ecuyer-CMRG")
@@ -21,7 +21,7 @@ dat <- readRDS('GSE165.rds')
 
 # C2 gene sets
 c2 <- read.gmt('c2.all.v6.2.symbols.gmt')
-tmp1 <- data.table(GeneSymbol = colnames(x))
+tmp1 <- data.table(GeneSymbol = colnames(dat$x))
 tmp2 <- seq_along(c2) %>%
   map_df(~ data.table(Pathway = names(c2)[.x],
                    GeneSymbol = unlist(c2[[.x]])) %>%
@@ -57,19 +57,18 @@ loss <- loss_fn(rf, df)
 
 # Create knockoff matrix
 mu <- rep(0, p)
-Sigma <- matrix(cov.shrink(x, verbose = FALSE), nrow = p)
-x_tilde <- create.gaussian(x, mu, Sigma, method = 'asdp')
+Sigma <- matrix(cov.shrink(dat$x, verbose = FALSE), nrow = p)
+x_tilde <- create.gaussian(dat$x, mu, Sigma, method = 'asdp')
+#x_tilde <- create.gaussian(dat$x, mu, Sigma, method = 'equi')
 
 # CPI function
 cpi <- function(pway) {
   # Replace submatrix of interest
   genes <- c2[[pway]]
-  x_s <- x_tilde[, genes]
-  # Condition on remaining genes
-  other_genes <- setdiff(colnames(x), genes)
-  x_r <- x[, other_genes]
+  x_0 <- dat$x
+  x_0[, genes] <- x_tilde[, genes]
+  df0 <- data.frame(x_0, y = dat$y)
   # Compute null loss
-  df0 <- data.frame(x_s, x_r, y = clin$Basal)
   loss0 <- loss_fn(rf, df0)
   # Test CPI
   delta <- loss0 - loss
