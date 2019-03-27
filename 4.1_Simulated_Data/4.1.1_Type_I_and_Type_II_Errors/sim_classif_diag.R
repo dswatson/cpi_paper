@@ -89,10 +89,6 @@ saveRDS(res, paste0(reg_name, ".Rds"))
 # Plots -------------------------------------------------------------
 res <- readRDS(paste0(reg_name, ".Rds"))
 
-res[, Problem := factor(problem, 
-                        levels = c("linear", "nonlinear"), 
-                        labels = c("Linear data", "Nonlinear data"))]
-
 # Boxplots of CPI values per variable
 plots_cpi <- lapply(unique(res$measure), function(m) {
   ggplot(res[measure == m, ], aes(x = Variable, y = CPI)) + 
@@ -140,12 +136,12 @@ lapply(unique(res$measure), function(m) {
   p <- plot_grid(plots_cpi[[m]], plots_tstat[[m]], plots_power[[m]], 
                  labels = "AUTO", ncol = 1)
   ggplot2::ggsave(paste0(reg_name, "_", m, ".pdf"), plot = p, width = 10, height = 13)
-  #ggplot2::ggsave(paste0(reg_name, "_", m, ".png"), plot = p, width = 10, height = 13, dpi = 300)
+  ggplot2::ggsave(paste0(reg_name, "_", m, ".png"), plot = p, width = 10, height = 13, dpi = 300)
 })
 
 # Coverage probabilities of confidence intervals
 library(xtable)
-tab <- res[Variable %in% c("X1"), mean(ci.low < 0), by = list(measure, test, Learner, Problem)]
+tab <- res[Variable %in% c("X1"), mean(ci.low < 0, na.rm = TRUE), by = list(measure, test, Learner, Problem)]
 invisible(lapply(unique(res$measure), function(m) {
   tab_m <- dcast(tab[measure == m, ], Learner ~ Problem + test, value.var = "V1")
   print(xtable(tab_m, digits = 4, caption = paste("Classif diff", m)), booktabs = TRUE, table.placement = "htbp",
