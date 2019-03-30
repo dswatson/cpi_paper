@@ -10,7 +10,7 @@ library(glmnet)
 set.seed(42)
 
 # Simulation parameters ----------------------------------------------------------------
-num_replicates <- 1000
+num_replicates <- 10000
 
 # Registry ----------------------------------------------------------------
 reg_name <- "ko_vs_cpi"
