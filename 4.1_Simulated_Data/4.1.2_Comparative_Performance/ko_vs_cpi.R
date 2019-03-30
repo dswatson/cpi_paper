@@ -223,8 +223,8 @@ ggplot2::ggsave(paste0(reg_name, "_rho.pdf"), width = 10, height = 3)
 
 # Fig.2 from Candès et al. - Power
 df <- res[type == "regression" & rho == 0 & p == 1000 & n == 300, mean(Power), by = list(Method, amplitude)]
-p_ampl_power <- ggplot(df, aes(x = amplitude, y = V1, col = Method)) + 
-  geom_line() + 
+p_ampl_power <- ggplot(df, aes(x = amplitude, y = V1, col = Method, shape = Method)) + 
+  geom_line() + geom_point() +
   ylim(0, 1) + 
   theme_bw() + 
   scale_color_npg() + 
@@ -233,9 +233,9 @@ p_ampl_power <- ggplot(df, aes(x = amplitude, y = V1, col = Method)) +
 
 # Fig.2 from Candès et al. - FDR
 df <- res[type == "regression" & rho == 0 & p == 1000 & n == 300, mean(FDR), by = list(Method, amplitude)]
-p_ampl_fdr <- ggplot(df, aes(x = amplitude, y = V1, col = Method)) + 
+p_ampl_fdr <- ggplot(df, aes(x = amplitude, y = V1, col = Method, shape = Method)) + 
   geom_hline(yintercept = 0.1, col = "black", linetype = "dashed") +
-  geom_line() + 
+  geom_line() + geom_point() +
   ylim(0, 1) + 
   theme_bw() + 
   scale_color_npg() + 
