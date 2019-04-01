@@ -58,8 +58,9 @@ loss <- loss_fn(rf, df)
 # Create knockoff matrix
 mu <- rep(0, p)
 Sigma <- matrix(cov.shrink(dat$x, verbose = FALSE), nrow = p)
-x_tilde <- create.gaussian(dat$x, mu, Sigma, method = 'asdp')
-#x_tilde <- create.gaussian(dat$x, mu, Sigma, method = 'equi')
+#solver <- create.solve_asdp(Sigma, max.size = 1000)
+#x_tilde <- create.gaussian(aa, mu, Sigma, method = 'asdp', diag_s = solver)
+x_tilde <- readRDS("x_tilde_1k.Rds")
 
 # CPI function
 cpi <- function(pway) {
