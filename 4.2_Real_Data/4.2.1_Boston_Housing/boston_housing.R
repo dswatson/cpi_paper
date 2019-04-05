@@ -42,5 +42,5 @@ ggplot(res, aes(x = Variable, fill = Learner, y = CPI, alpha = signif)) +
   theme_bw() + 
   theme(legend.position = "top") + 
   guides(alpha = FALSE) + 
-  ylab(expression('CPI'[lambda]))
+  ylab("CPI")
 ggsave("boston_housing.pdf", width = 6, height = 8)
