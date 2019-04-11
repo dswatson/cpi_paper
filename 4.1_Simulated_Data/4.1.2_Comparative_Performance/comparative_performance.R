@@ -103,8 +103,8 @@ lapply(unique(res$n), function(nn) {
     xlab("Effect size") + ylab("Rejection proportion") +
     theme_bw() + 
     theme(legend.position = 'bottom')
-  ggplot2::ggsave(paste0(reg_name, "_diag_", nn, ".pdf"), width = 10, height = 5)
-  ggplot2::ggsave(paste0(reg_name, "_diag_", nn, ".png"), width = 10, height = 5, dpi = 300)
+  ggplot2::ggsave(paste0(reg_name, "_diag_", nn, ".pdf"), width = 10, height = 6)
+  ggplot2::ggsave(paste0(reg_name, "_diag_", nn, ".png"), width = 10, height = 6, dpi = 300)
 })
 
 # Plot correlated
@@ -118,6 +118,6 @@ lapply(unique(res$n), function(nn) {
     xlab("Effect size") + ylab("Rejection proportion") +
     theme_bw() + 
     theme(legend.position = 'bottom')
-  ggplot2::ggsave(paste0(reg_name, "_toeplitz_", nn, ".pdf"), width = 10, height = 5)
-  ggplot2::ggsave(paste0(reg_name, "_toeplitz_", nn, ".png"), width = 10, height = 5, dpi = 300)
+  ggplot2::ggsave(paste0(reg_name, "_toeplitz_", nn, ".pdf"), width = 10, height = 6)
+  ggplot2::ggsave(paste0(reg_name, "_toeplitz_", nn, ".png"), width = 10, height = 6, dpi = 300)
 })
