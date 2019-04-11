@@ -226,7 +226,7 @@ p_ampl_power <- ggplot(df, aes(x = effect_size, y = V1, col = Method, shape = Me
 #ggplot2::ggsave(paste0(reg_name, "_power_ampl.pdf"), width = 10, height = 5)
 
 # Fig.2 from Candès et al. - FDR
-df <- res[type == "regression" & rho == 0 & p == 1000 & n == 300, mean(FDR), by = list(Method, amplitude)]
+df <- res[type == "regression" & rho == 0 & p == 1000 & n == 300, mean(FDR), by = list(Method, amplitude, effect_size)]
 p_ampl_fdr <- ggplot(df, aes(x = effect_size, y = V1, col = Method, shape = Method)) + 
   geom_hline(yintercept = 0.1, col = "black", linetype = "dashed") +
   geom_line() + geom_point() +
