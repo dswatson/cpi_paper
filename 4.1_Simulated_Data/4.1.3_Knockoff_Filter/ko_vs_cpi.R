@@ -185,13 +185,14 @@ saveRDS(res, paste0(reg_name, ".Rds"))
 res <- readRDS(paste0(reg_name, ".Rds"))
 res[, Method := factor(algorithm, levels = c("cpi", "knockoff_filter"), 
                        labels = c("CPI", "Knockoff\nFilter"))]
+res[, effect_size := amplitude / sqrt(300)]
 
 # Mean over replications
-res[, Power := mean(reject, na.rm = TRUE), by = list(Method, n, p, type, rho, amplitude, variable)]
+res[, Power := mean(reject, na.rm = TRUE), by = list(Method, n, p, type, rho, amplitude, effect_size, variable)]
 
 # Mean over variables
-res[, Power := mean(Power, na.rm = TRUE), by = list(Method, n, p, type, rho, amplitude)]
-res[, FDR := mean(FDR, na.rm = TRUE), by = list(Method, n, p, type, rho, amplitude)]
+res[, Power := mean(Power, na.rm = TRUE), by = list(Method, n, p, type, rho, amplitude, effect_size)]
+res[, FDR := mean(FDR, na.rm = TRUE), by = list(Method, n, p, type, rho, amplitude, effect_size)]
 
 # Fig.1 from Candès et al. - Power
 df <- res[type == "regression" & amplitude == 10 & p == 1000 & n == 300, mean(Power), by = list(Method, rho)]
@@ -215,24 +216,24 @@ p_rho_fdr <- ggplot(df, aes(x = rho, y = V1, col = Method, shape = Method)) +
 #ggplot2::ggsave(paste0(reg_name, "_fdr_rho.pdf"), width = 10, height = 5)
 
 # Fig.2 from Candès et al. - Power
-df <- res[type == "regression" & rho == 0 & p == 1000 & n == 300, mean(Power), by = list(Method, amplitude)]
-p_ampl_power <- ggplot(df, aes(x = amplitude, y = V1, col = Method, shape = Method)) + 
+df <- res[type == "regression" & rho == 0 & p == 1000 & n == 300, mean(Power), by = list(Method, amplitude, effect_size)]
+p_ampl_power <- ggplot(df, aes(x = effect_size, y = V1, col = Method, shape = Method)) + 
   geom_line() + geom_point() +
   ylim(0, 1) + 
   theme_bw() + 
   scale_color_npg() + 
-  xlab("Amplitude") + ylab("Power")
+  xlab("Effect size") + ylab("Power")
 #ggplot2::ggsave(paste0(reg_name, "_power_ampl.pdf"), width = 10, height = 5)
 
 # Fig.2 from Candès et al. - FDR
 df <- res[type == "regression" & rho == 0 & p == 1000 & n == 300, mean(FDR), by = list(Method, amplitude)]
-p_ampl_fdr <- ggplot(df, aes(x = amplitude, y = V1, col = Method, shape = Method)) + 
+p_ampl_fdr <- ggplot(df, aes(x = effect_size, y = V1, col = Method, shape = Method)) + 
   geom_hline(yintercept = 0.1, col = "black", linetype = "dashed") +
   geom_line() + geom_point() +
   ylim(0, 1) + 
   theme_bw() + 
   scale_color_npg() + 
-  xlab("Amplitude") + ylab("FDR")
+  xlab("Effect size") + ylab("FDR")
 #ggplot2::ggsave(paste0(reg_name, "_fdr_ampl.pdf"), width = 10, height = 5)
 
 # Plot all together
