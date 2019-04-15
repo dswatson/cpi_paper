@@ -248,3 +248,4 @@ plot_grid(p_ampl_power + theme(legend.position = "none"),
           p_ampl_fdr + theme(legend.position = "none"), 
           nrow = 1, rel_widths = c(.4, .15, .4))
 ggplot2::ggsave(paste0(reg_name, "_ampl.pdf"), width = 10, height = 3)
+
