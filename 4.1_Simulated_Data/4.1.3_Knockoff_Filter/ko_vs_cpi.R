@@ -10,7 +10,7 @@ library(glmnet)
 set.seed(42)
 
 # Simulation parameters ----------------------------------------------------------------
-num_replicates <- 1000 #10000
+num_replicates <- 10000
 
 # Registry ----------------------------------------------------------------
 reg_name <- "ko_vs_cpi"
@@ -214,10 +214,10 @@ p_ampl_fdr <- ggplot(df, aes(x = beta, y = V1, col = Method, shape = Method)) +
 #ggplot2::ggsave(paste0(reg_name, "_fdr_ampl.pdf"), width = 10, height = 5)
 
 # Plot all together
-plot_grid(plot_grid(p_rho_power + theme(legend.position = "none"), 
-                    p_rho_fdr + theme(legend.position = "none"), 
-                    p_ampl_power + theme(legend.position = "none"), 
+plot_grid(plot_grid(p_ampl_power + theme(legend.position = "none"), 
                     p_ampl_fdr + theme(legend.position = "none"), 
+                    p_rho_power + theme(legend.position = "none"), 
+                    p_rho_fdr + theme(legend.position = "none"), 
                     nrow = 2, ncol = 2),
           get_legend(p_ampl_power + guides(col = guide_legend(nrow = 2))), 
           nrow = 1, ncol = 2, rel_widths = c(.9, .1))
