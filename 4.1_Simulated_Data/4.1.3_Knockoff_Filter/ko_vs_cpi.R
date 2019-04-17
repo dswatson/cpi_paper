@@ -10,7 +10,7 @@ library(glmnet)
 set.seed(42)
 
 # Simulation parameters ----------------------------------------------------------------
-num_replicates <- 10000
+num_replicates <- 1000 #10000
 
 # Registry ----------------------------------------------------------------
 reg_name <- "ko_vs_cpi"
@@ -18,53 +18,34 @@ reg_dir <- file.path("registries", reg_name)
 dir.create("registries", showWarnings = FALSE)
 unlink(reg_dir, recursive = TRUE)
 makeExperimentRegistry(file.dir = reg_dir, 
-                       packages = c("knockoff", "glmnet"))
+                       packages = c("mvtnorm", "knockoff", "glmnet", "mlr", "cpi"))
 
 # Problems ----------------------------------------------------------------
-create_data <- function(data, job, n, p, type, rho, amplitude) {
+create_data <- function(data, job, n, p, rho, beta) {
   # Simulate predictors
-  x <- matrix(rnorm(n * p), ncol = p)
-  if (rho == 0) {
-    Sigma <- diag(p)
-  } else {
-    Sigma <- toeplitz(rho^(0:(p - 1)))
-    x <- x %*% chol(Sigma)
-  }
-  dimnames(x) <- list(NULL, paste0('x', seq_len(p)))
+  sigma <- toeplitz(rho^(0:(p - 1)))
+  x <- matrix(rmvnorm(n = n, sigma = sigma), ncol = p,
+              dimnames = list(NULL, paste0('x', seq_len(p))))
+  
   # Simulate signal
   k <- 60
   nonzero <- sample(p, k)
   signs <- sample(c(1, -1), size = p, replace = TRUE)
-  beta <- amplitude * (seq_len(p) %in% nonzero) / sqrt(n) * signs
+  beta <- beta * (seq_len(p) %in% nonzero) * signs
   signal <- x %*% beta
+  y <- signal + rnorm(n)
+  
   # Gaussian MX knockoff parameters
   mu <- rep(0, p)
   
   # Create solver
-  #diag_s <- create.solve_asdp(Sigma)
+  #diag_s <- create.solve_asdp(sigma)
   diag_s <- readRDS(paste0("solvers/", p, "_", rho, ".Rds"))
   
   # Generate knockoffs
-  x_tilde <- create.gaussian(x, mu, Sigma, diag_s = diag_s)
+  x_tilde <- create.gaussian(x, mu, sigma, diag_s = diag_s)
   
-  # Generate test dataset
-  x_test <- matrix(rnorm(n * p), ncol = p)
-  if (rho > 0) {
-    x_test <- x_test %*% chol(Sigma)
-  }
-  dimnames(x_test) <- list(NULL, paste0('x', seq_len(p)))
-  signal_test <- x_test %*% beta
-  
-  if (type == 'regression') {
-    y <- signal + rnorm(n)
-    y_test <- signal_test + rnorm(n)
-  } else if (type == 'classification') {
-    y <- as.factor(rbinom(n, size = 1, prob = plogis(signal)))
-    y_test <- rbinom(n, size = 1, prob = plogis(signal_test))
-  }
-  
-  list(x = x, x_test = x_test, x_tilde = x_tilde, 
-       y = y, y_test = y_test, beta = beta)
+  list(x = x, x_tilde = x_tilde, y = y, beta = beta)
 }
 
 addProblem(name = "data", fun = create_data, seed = 43)
@@ -78,11 +59,7 @@ knockoff_filter <- function(data, job, instance) {
   
   p <- ncol(x)
   
-  if (is.factor(y)) {
-    w <- stat.glmnet_coefdiff(x, x_tilde, y, family = 'binomial', cores = 1)
-  } else {
-    w <- stat.glmnet_coefdiff(x, x_tilde, y, family = 'gaussian', cores = 1)
-  }
+  w <- stat.glmnet_coefdiff(x, x_tilde, y, family = 'gaussian', cores = 1)
   tau <- knockoff.threshold(w, fdr = 0.1, offset = 0)
   pos <- which(w > tau)
   neg <- which(w <= tau)
@@ -97,40 +74,41 @@ addAlgorithm(name = "knockoff_filter", fun = knockoff_filter)
 
 cpi <- function(data, job, instance) {
   x <- instance$x
-  x_test <- instance$x_test
   x_tilde <- instance$x_tilde
   y <- instance$y
-  y_test <- instance$y_test
   beta <- instance$beta
-  
+  n <- nrow(x)
   p <- ncol(x)
   
-  # Fit model, compute loss
-  if (is.factor(y)) {
-    f <- cv.glmnet(x, y, family = 'binomial', nlambda = 500, parallel = FALSE)
-    y_hat <- predict(f, newx = x_test, s = 'lambda.min', type = 'response')
-    loss <- -(y_test * log(y_hat) + (1 - y_test) * log(1 - y_hat))
-  } else {
-    f <- cv.glmnet(x, y, family = 'gaussian', nlambda = 500, parallel = FALSE)
-    y_hat <- predict(f, newx = x_test, s = 'lambda.min')
-    loss <- (y_test - y_hat)^2
-  }
-  p_values <- rep(NA, p)
-  cpi_fn <- function(j) {
-    x_test[, j] <- x_tilde[, j]
-    if (is.factor(y)) {
-      y_hat0 <- predict(f, newx = x_test, s = 'lambda.min', type = 'response')
-      loss0 <- -(y_test * log(y_hat0) + (1 - y_test) * log(1 - y_hat0))
-    } else {
-      y_hat0 <- predict(f, newx = x_test, s = 'lambda.min')
-      loss0 <- (y_test - y_hat0)^2
-    }
-    delta <- loss0 - loss
-    t_test <- t.test(delta, alternative = 'greater')
-    return(t_test$p.value)
-  }
+  # Prepare mlr
+  task <- makeRegrTask(data = data.frame(y = y, x), target = "y")
+  learner <- makeLearner("regr.cvglmnet", nlambda = 500)
+  resample_instance <- makeResampleInstance(desc = makeResampleDesc("CV", iters = 10), task = task)
+  measure <- mse
   
-  nonzero <- predict(f, s = 'lambda.min', type = 'nonzero')$X1
+  # Error on original data
+  fit_full <- cpi:::fit_learner(learner = learner, task = task, resampling = resample_instance, measure = measure)
+  pred_full <- cpi:::predict_learner(fit_full, task, resampling = resample_instance)
+  err_full <- cpi:::compute_loss(pred_full, measure)
+  
+  # Function for CPI
+  cpi_fn <- function(j) {
+    reduced_data <- getTaskData(task)
+    reduced_data[, getTaskFeatureNames(task)[j]] <- x_tilde[, getTaskFeatureNames(task)[j]]
+    reduced_task <- changeData(task, reduced_data)
+    
+    pred_reduced <- cpi:::predict_learner(fit_full, reduced_task, resampling = resample_instance)
+    err_reduced <- cpi:::compute_loss(pred_reduced, measure)
+    
+    dif <- err_reduced - err_full
+    t.test(dif, alternative = 'greater')$p.value
+  }
+
+  # p-values for all nonzero variables
+  p_values <- rep(NA, p)
+  nonzero <- which(rowSums(sapply(fit_full, function(x) {
+    1:p %in% predict(x$learner.model, s = 'lambda.min', type = 'nonzero')$X1
+  })) == length(fit_full))
   p_values[nonzero] <- foreach(j = nonzero, .combine = c) %do% cpi_fn(j)
   q_values <- p.adjust(p_values, method = 'fdr')
   pos <- which(q_values <= 0.1)
@@ -149,14 +127,14 @@ algo_design <- list(knockoff_filter = data.frame(),
                     cpi = data.frame())
                      
 # Varying rho (Fig. 1)
-prob_design <- list(data = expand.grid(n = 300, p = 1000, type = "regression",
-                                       rho = seq(from = 0, to = 0.8, by = 0.1), amplitude = 10,
+prob_design <- list(data = expand.grid(n = 300, p = 1000, beta = 1,
+                                       rho = seq(from = 0, to = .8, by = .1), 
                                        stringsAsFactors = FALSE))
 addExperiments(prob_design, algo_design, repls = num_replicates)
 
 # Varying amplitude (Fig. 2)
-prob_design <- list(data = expand.grid(n = 300, p = 1000, type = "regression",
-                                       rho = 0, amplitude = seq(from = 0, to = 18, by = 1),
+prob_design <- list(data = expand.grid(n = 300, p = 1000, rho = 0, 
+                                       beta = seq(from = .1, to = 1, by = .1),
                                        stringsAsFactors = FALSE))
 addExperiments(prob_design, algo_design, repls = num_replicates)
 
@@ -185,17 +163,16 @@ saveRDS(res, paste0(reg_name, ".Rds"))
 res <- readRDS(paste0(reg_name, ".Rds"))
 res[, Method := factor(algorithm, levels = c("cpi", "knockoff_filter"), 
                        labels = c("CPI", "Knockoff\nFilter"))]
-res[, effect_size := amplitude / sqrt(300)]
 
 # Mean over replications
-res[, Power := mean(reject, na.rm = TRUE), by = list(Method, n, p, type, rho, amplitude, effect_size, variable)]
+res[, Power := mean(reject, na.rm = TRUE), by = list(Method, n, p, rho, beta, variable)]
 
 # Mean over variables
-res[, Power := mean(Power, na.rm = TRUE), by = list(Method, n, p, type, rho, amplitude, effect_size)]
-res[, FDR := mean(FDR, na.rm = TRUE), by = list(Method, n, p, type, rho, amplitude, effect_size)]
+res[, Power := mean(Power, na.rm = TRUE), by = list(Method, n, p, rho, beta)]
+res[, FDR := mean(FDR, na.rm = TRUE), by = list(Method, n, p, rho, beta)]
 
 # Fig.1 from Candès et al. - Power
-df <- res[type == "regression" & amplitude == 10 & p == 1000 & n == 300, mean(Power), by = list(Method, rho)]
+df <- res[beta == 1, mean(Power), by = list(Method, rho)]
 p_rho_power <- ggplot(df, aes(x = rho, y = V1, col = Method, shape = Method)) + 
   geom_line() + geom_point() +  
   ylim(0, 1) + 
@@ -205,7 +182,7 @@ p_rho_power <- ggplot(df, aes(x = rho, y = V1, col = Method, shape = Method)) +
 #ggplot2::ggsave(paste0(reg_name, "_power_rho.pdf"), width = 10, height = 5)
 
 # Fig.1 from Candès et al. - FDR
-df <- res[type == "regression" & amplitude == 10 & p == 1000 & n == 300, mean(FDR), by = list(Method, rho)]
+df <- res[beta == 1, mean(FDR), by = list(Method, rho)]
 p_rho_fdr <- ggplot(df, aes(x = rho, y = V1, col = Method, shape = Method)) + 
   geom_hline(yintercept = 0.1, col = "black", linetype = "dashed") +
   geom_line() + geom_point() +
@@ -216,8 +193,8 @@ p_rho_fdr <- ggplot(df, aes(x = rho, y = V1, col = Method, shape = Method)) +
 #ggplot2::ggsave(paste0(reg_name, "_fdr_rho.pdf"), width = 10, height = 5)
 
 # Fig.2 from Candès et al. - Power
-df <- res[type == "regression" & rho == 0 & p == 1000 & n == 300, mean(Power), by = list(Method, amplitude, effect_size)]
-p_ampl_power <- ggplot(df, aes(x = effect_size, y = V1, col = Method, shape = Method)) + 
+df <- res[rho == 0, mean(Power), by = list(Method, beta)]
+p_ampl_power <- ggplot(df, aes(x = beta, y = V1, col = Method, shape = Method)) + 
   geom_line() + geom_point() +
   ylim(0, 1) + 
   theme_bw() + 
@@ -226,8 +203,8 @@ p_ampl_power <- ggplot(df, aes(x = effect_size, y = V1, col = Method, shape = Me
 #ggplot2::ggsave(paste0(reg_name, "_power_ampl.pdf"), width = 10, height = 5)
 
 # Fig.2 from Candès et al. - FDR
-df <- res[type == "regression" & rho == 0 & p == 1000 & n == 300, mean(FDR), by = list(Method, amplitude, effect_size)]
-p_ampl_fdr <- ggplot(df, aes(x = effect_size, y = V1, col = Method, shape = Method)) + 
+df <- res[rho == 0, mean(FDR), by = list(Method, beta)]
+p_ampl_fdr <- ggplot(df, aes(x = beta, y = V1, col = Method, shape = Method)) + 
   geom_hline(yintercept = 0.1, col = "black", linetype = "dashed") +
   geom_line() + geom_point() +
   ylim(0, 1) + 
