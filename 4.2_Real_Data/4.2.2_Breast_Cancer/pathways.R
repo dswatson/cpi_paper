@@ -60,7 +60,7 @@ mu <- rep(0, p)
 Sigma <- matrix(cov.shrink(dat$x, verbose = FALSE), nrow = p)
 #solver <- create.solve_asdp(Sigma, max.size = 1000)
 #x_tilde <- create.gaussian(aa, mu, Sigma, method = 'asdp', diag_s = solver)
-x_tilde <- readRDS("x_tilde_1k.Rds")
+x_tilde <- readRDS("x_tilde_8k.Rds")
 
 # CPI function
 cpi <- function(pway) {
@@ -91,7 +91,7 @@ res <- foreach(pway = names(c2), .combine = rbind) %dopar% cpi(pway)
 res <- res %>%
   arrange(p.value) %>%
   mutate(q.value = p.adjust(p.value, method = 'fdr'))
-fwrite(res, 'BreastCancer_CPI_res.csv')
+fwrite(res, 'BreastCancer_CPI_res_sdp.csv')
 
 
 
