@@ -38,7 +38,7 @@ cpi <- function(data, job, instance, learner_name, ...) {
                      regr.svm = list(kernel = "radial"), 
                      list())
   as.list(cpi(task = instance, learner = makeLearner(learner_name, par.vals = par.vals), 
-                          resampling = makeResampleDesc("CV", iters = 5), ...))
+                          resampling = makeResampleDesc("Holdout"), ...))
 }
 addAlgorithm(name = "cpi", fun = cpi)
 
