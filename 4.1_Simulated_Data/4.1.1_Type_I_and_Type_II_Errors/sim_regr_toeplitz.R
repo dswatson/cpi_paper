@@ -135,8 +135,8 @@ library(cowplot)
 lapply(unique(res$measure), function(m) {
   p <- plot_grid(plots_cpi[[m]], plots_tstat[[m]], plots_power[[m]], 
                  labels = "AUTO", ncol = 1)
-  ggplot2::ggsave(paste0(reg_name, "_", m, ".pdf"), plot = p, width = 10, height = 13)
-  ggplot2::ggsave(paste0(reg_name, "_", m, ".png"), plot = p, width = 10, height = 13, dpi = 300)
+  ggplot2::ggsave(paste0(reg_name, "_", m, ".pdf"), plot = p, width = 10, height = 12)
+  ggplot2::ggsave(paste0(reg_name, "_", m, ".png"), plot = p, width = 10, height = 12, dpi = 300)
 })
 
 # Coverage probabilities of confidence intervals
