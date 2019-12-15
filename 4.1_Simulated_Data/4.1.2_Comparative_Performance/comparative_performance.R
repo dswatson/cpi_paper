@@ -31,7 +31,7 @@ addProblem(name = "data", fun = data_train_test, seed = 43)
 # Algorithms ----------------------------------------------------------------
 addAlgorithm(name = "cpi", fun = cpi_fn)
 addAlgorithm(name = "anova", fun = anova_fn)
-addAlgorithm(name = "fcit", fun = fcit_fn)
+addAlgorithm(name = "loco", fun = loco_fn)
 addAlgorithm(name = "gcm", fun = gcm_fn)
 
 # Experiments -----------------------------------------------------------
@@ -43,7 +43,7 @@ algo_design <- list(cpi = expand.grid(learner_name = learners,
                                       stringsAsFactors = FALSE), 
                     anova = expand.grid(learner_name = learners,
                                         stringsAsFactors = FALSE),
-                    fcit = expand.grid(learner_name = learners,
+                    loco = expand.grid(learner_name = learners,
                                        stringsAsFactors = FALSE),
                     gcm = expand.grid(learner_name = learners,
                                       stringsAsFactors = FALSE))
@@ -78,8 +78,8 @@ res[, Type := factor(type,
                      levels = c("linear", "nonlinear"),
                      labels = c("Linear data", "Nonlinear data"))]
 res[, Test := factor(algorithm,
-                     levels = c("cpi", "anova", "fcit", "gcm"),
-                     labels = c("CPI", "ANOVA", "FCIT", "GCM"))]
+                     levels = c("cpi", "anova", "loco", "gcm"),
+                     labels = c("CPI", "ANOVA", "LOCO", "GCM"))]
 saveRDS(res, paste0(reg_name, ".Rds"))
 
 # Plots -------------------------------------------------------------
@@ -91,8 +91,6 @@ res_mean <- res[, .(power = mean(reject, na.rm = TRUE)), by = .(Type, Test, Lear
 levels(res_mean$Variable) <- rep(seq(0, .9, length.out = 10), each = 1)
 res_mean[, Variable := abs(as.numeric(as.character(Variable)))]
 res_mean[, power := mean(power), by = list(Type, Test, Learner, Variable, cov_base, n)]
-
-levels(res_mean$Test)[levels(res_mean$Test) == "FCIT"] <- "LOCO"
 
 # Plot uncorrelated
 lapply(unique(res$n), function(nn) {

@@ -42,8 +42,8 @@ anova_fn <- function(data, job, instance, learner_name, ...) {
   data.frame(Variable = colnames(test_data)[-1], p.value = pvals)
 }
 
-# Chalupka et al.'s fast conditional independence test (FCIT) ---------------------------
-fcit_fn <- function(data, job, instance, learner_name, ...) {
+# Lei et al. (2018)’s leave-one-covariate-out procedure (LOCO) ---------------------------
+loco_fn <- function(data, job, instance, learner_name, ...) {
   par.vals <- switch(learner_name, 
                      regr.ranger = list(num.trees = 50), 
                      regr.nnet = list(size = 20, decay = .1, trace = FALSE), 
@@ -58,7 +58,7 @@ fcit_fn <- function(data, job, instance, learner_name, ...) {
   pred <- predict(fit, newdata = test_data)
   loss <- (test_data$y - getPredictionResponse(pred))^2
   
-  # For each variable calculate FCIT
+  # For each variable calculate LOCO
   pvals <- sapply(2:ncol(test_data), function(j) {
     train0_task <- makeRegrTask(data = train_data[, -j], target = "y")
     fit0 <- train(learner, train0_task)  
