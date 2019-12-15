@@ -92,6 +92,8 @@ levels(res_mean$Variable) <- rep(seq(0, .9, length.out = 10), each = 1)
 res_mean[, Variable := abs(as.numeric(as.character(Variable)))]
 res_mean[, power := mean(power), by = list(Type, Test, Learner, Variable, cov_base, n)]
 
+levels(res_mean$Test)[levels(res_mean$Test) == "FCIT"] <- "LOCO"
+
 # Plot uncorrelated
 lapply(unique(res$n), function(nn) {
   ggplot(res_mean[cov_base == 0 & n == nn, ], aes(x = Variable, y = power, col = Test, shape = Test)) +
