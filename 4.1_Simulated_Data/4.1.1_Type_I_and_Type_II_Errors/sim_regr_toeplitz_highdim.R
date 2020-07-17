@@ -143,8 +143,8 @@ library(cowplot)
 lapply(as.character(unique(res$p)), function(pp) {
   p <- plot_grid(plots_cpi[[pp]], plots_tstat[[pp]], plots_power[[pp]], 
                  labels = "AUTO", ncol = 1)
-  ggplot2::ggsave(paste0(reg_name, "_highdim_", pp, ".pdf"), plot = p, width = 10, height = 12)
-  # ggplot2::ggsave(paste0(reg_name, "_highdim_", pp, ".png"), plot = p, width = 10, height = 12, dpi = 300)
+  ggplot2::ggsave(paste0(reg_name, "_", pp, ".pdf"), plot = p, width = 10, height = 12)
+  ggplot2::ggsave(paste0(reg_name, "_", pp, ".png"), plot = p, width = 10, height = 12, dpi = 300)
 })
 
 # # Coverage probabilities of confidence intervals
